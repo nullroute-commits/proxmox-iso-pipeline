@@ -43,39 +43,43 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 - **debian**: trixie-20241202-slim
 
 ### System Dependencies
-All versions verified as available in `debian:trixie-20241202-slim` (as of 2025-12-19).
+Packages installed without version pinning to support multi-architecture builds (amd64 and arm64).
+Package versions may vary between architectures.
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| python3.13 | 3.13.5-2 | Python runtime |
-| python3.13-venv | 3.13.5-2 | Virtual environment support |
-| python3-pip | 25.1.1+dfsg-1 | Python package installer |
-| wget | 1.25.0-2 | File downloader |
-| curl | 8.14.1-2+deb13u2 | Transfer tool |
-| xorriso | 1.5.6-1.2+b1 | ISO image creator |
-| isolinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader |
-| syslinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader suite |
-| syslinux-utils | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Syslinux utilities |
-| genisoimage | 9:1.1.11-4 | ISO creation tool |
-| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
-| sudo | 1.9.16p2-3 | Privilege escalation |
-| ca-certificates | 20250419 | SSL certificates |
-| gnupg | 2.4.7-21 | GPG encryption |
+| Package | Purpose | Architecture |
+|---------|---------|--------------|
+| python3.13 | Python runtime | all |
+| python3.13-venv | Virtual environment support | all |
+| python3-pip | Python package installer | all |
+| wget | File downloader | all |
+| curl | Transfer tool | all |
+| xorriso | ISO image creator | all |
+| isolinux | Boot loader | all |
+| genisoimage | ISO creation tool | all |
+| squashfs-tools | SquashFS filesystem tools | all |
+| sudo | Privilege escalation | all |
+| ca-certificates | SSL certificates | all |
+| gnupg | GPG encryption | all |
+| syslinux | Boot loader suite (legacy BIOS) | amd64 only |
+| syslinux-utils | Syslinux utilities | amd64 only |
+
+**Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support.
+They are not available on ARM64 architecture and are conditionally installed only on amd64 builds.
 
 ## GitHub Actions
 
 ### Actions
 | Action | Version | Purpose |
 |--------|---------|---------|
-| actions/checkout | v4.2.2 | Repository checkout |
-| actions/setup-python | v5.3.0 | Python environment setup |
-| docker/setup-qemu-action | v3.2.0 | QEMU emulation for multi-arch |
-| docker/setup-buildx-action | v3.7.1 | Docker Buildx setup |
-| docker/login-action | v3.3.0 | Docker registry login |
-| docker/metadata-action | v5.6.1 | Docker metadata extraction |
-| docker/build-push-action | v6.9.0 | Docker image build/push |
-| aquasecurity/trivy-action | 0.28.0 | Security vulnerability scanning |
-| github/codeql-action/upload-sarif | v3.27.5 | CodeQL SARIF upload |
+| actions/checkout | v6.0.1 | Repository checkout |
+| actions/setup-python | v6.1.0 | Python environment setup |
+| docker/setup-qemu-action | v3.7.0 | QEMU emulation for multi-arch |
+| docker/setup-buildx-action | v3.12.0 | Docker Buildx setup |
+| docker/login-action | v3.6.0 | Docker registry login |
+| docker/metadata-action | v5.10.0 | Docker metadata extraction |
+| docker/build-push-action | v6.18.0 | Docker image build/push |
+| aquasecurity/trivy-action | 0.33.1 | Security vulnerability scanning |
+| github/codeql-action/upload-sarif | v4.31.9 | CodeQL SARIF upload |
 
 ## Docker
 
@@ -156,7 +160,8 @@ Firmware packages are downloaded from Debian repositories and versions are deter
 
 ## Security Considerations
 
-- All versions are pinned to prevent supply chain attacks
+- Python package versions are pinned to prevent supply chain attacks
+- System packages use latest versions from stable Debian Trixie repositories
 - Regular security scans with Trivy
 - Dependencies are reviewed before updates
 - Critical security patches are applied immediately

@@ -9,24 +9,34 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Install system dependencies with pinned versions from Debian Trixie
-# Versions verified as available in debian:trixie-20241202-slim
+# Install system dependencies
+# Note: Some packages don't have pinned versions due to architecture-specific
+# version differences between amd64 and arm64. syslinux packages are x86-only
+# and are conditionally installed below.
 RUN apt-get update && apt-get install -y \
-    python3.13=3.13.5-2 \
-    python3.13-venv=3.13.5-2 \
-    python3-pip=25.1.1+dfsg-1 \
-    wget=1.25.0-2 \
-    curl=8.14.1-2+deb13u2 \
-    xorriso=1.5.6-1.2+b1 \
-    isolinux=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
-    syslinux=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
-    syslinux-utils=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
-    genisoimage=9:1.1.11-4 \
-    squashfs-tools=1:4.6.1-1 \
-    sudo=1.9.16p2-3 \
-    ca-certificates=20250419 \
-    gnupg=2.4.7-21 \
+    python3.13 \
+    python3.13-venv \
+    python3-pip \
+    wget \
+    curl \
+    xorriso \
+    isolinux \
+    genisoimage \
+    squashfs-tools \
+    sudo \
+    ca-certificates \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install x86-specific packages (syslinux) only on amd64 architecture
+# These are needed for legacy BIOS boot support and are not available on ARM
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        apt-get update && apt-get install -y \
+        syslinux \
+        syslinux-utils \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Stage 2: Python environment
 FROM base AS python-env
