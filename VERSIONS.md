@@ -14,7 +14,7 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 ### Core Dependencies
 | Package | Version | Purpose |
 |---------|---------|---------|
-| requests | 2.32.3 | HTTP library for downloading files |
+| requests | 2.32.4 | HTTP library for downloading files |
 | pyyaml | 6.0.2 | YAML configuration parsing |
 | click | 8.1.7 | CLI framework |
 | rich | 13.9.4 | Terminal formatting and progress bars |
@@ -33,8 +33,8 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 ### Build Tools
 | Package | Version | Purpose |
 |---------|---------|---------|
-| pip | 24.3.1 | Package installer |
-| setuptools | 75.6.0 | Package builder |
+| pip | 25.3 | Package installer |
+| setuptools | 78.1.1 | Package builder |
 | wheel | 0.45.0 | Wheel package support |
 
 ## System Packages (Debian Trixie)
@@ -43,28 +43,38 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 - **debian**: trixie-20241202-slim
 
 ### System Dependencies
-Packages installed without version pinning to support multi-architecture builds (amd64 and arm64).
-Package versions may vary between architectures.
+All versions are pinned for reproducibility. Some packages have architecture-specific versions.
 
-| Package | Purpose | Architecture |
-|---------|---------|--------------|
-| python3.13 | Python runtime | all |
-| python3.13-venv | Virtual environment support | all |
-| python3-pip | Python package installer | all |
-| wget | File downloader | all |
-| curl | Transfer tool | all |
-| xorriso | ISO image creator | all |
-| isolinux | Boot loader | all |
-| genisoimage | ISO creation tool | all |
-| squashfs-tools | SquashFS filesystem tools | all |
-| sudo | Privilege escalation | all |
-| ca-certificates | SSL certificates | all |
-| gnupg | GPG encryption | all |
-| syslinux | Boot loader suite (legacy BIOS) | amd64 only |
-| syslinux-utils | Syslinux utilities | amd64 only |
+#### Architecture-Independent Packages
+| Package | Version | Purpose |
+|---------|---------|---------|
+| python3.13 | 3.13.5-2 | Python runtime |
+| python3.13-venv | 3.13.5-2 | Virtual environment support |
+| python3-pip | 25.1.1+dfsg-1 | Python package installer |
+| wget | 1.25.0-2 | File downloader |
+| curl | 8.14.1-2+deb13u2 | Transfer tool |
+| isolinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader (arch: all) |
+| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
+| sudo | 1.9.16p2-3 | Privilege escalation |
+| ca-certificates | 20250419 | SSL certificates |
+| gnupg | 2.4.7-21 | GPG encryption |
+
+#### Architecture-Specific Packages (amd64)
+| Package | Version | Purpose |
+|---------|---------|---------|
+| xorriso | 1.5.6-1.2+b1 | ISO image creator |
+| genisoimage | 9:1.1.11-4 | ISO creation tool |
+| syslinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader suite (legacy BIOS) |
+| syslinux-utils | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Syslinux utilities |
+
+#### Architecture-Specific Packages (arm64)
+| Package | Version | Purpose |
+|---------|---------|---------|
+| xorriso | 1.5.6-1.2+b1 | ISO image creator |
+| genisoimage | 9:1.1.11-4 | ISO creation tool |
 
 **Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support.
-They are not available on ARM64 architecture and are conditionally installed only on amd64 builds.
+They are not available on ARM64 architecture and are only installed on amd64 builds.
 
 ## GitHub Actions
 
@@ -160,8 +170,8 @@ Firmware packages are downloaded from Debian repositories and versions are deter
 
 ## Security Considerations
 
-- Python package versions are pinned to prevent supply chain attacks
-- System packages use latest versions from stable Debian Trixie repositories
+- All versions are pinned to prevent supply chain attacks
+- Architecture-specific packages use divergent process flows with pinned versions
 - Regular security scans with Trivy
 - Dependencies are reviewed before updates
 - Critical security patches are applied immediately
