@@ -61,6 +61,42 @@ class FirmwareManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.debian_release = debian_release
         self.firmware_sources = self._load_firmware_sources()
+        self._sources_configured = False
+
+    def _configure_apt_sources(self) -> None:
+        """Configure apt sources for the target Debian release with non-free."""
+        if self._sources_configured:
+            return
+
+        logger.info(f"Configuring apt sources for {self.debian_release}")
+
+        # Create sources list for the target release including non-free
+        sources_content = f"""deb {self.DEBIAN_REPO_BASE} {self.debian_release} main contrib non-free non-free-firmware
+deb {self.DEBIAN_REPO_BASE} {self.debian_release}-updates main contrib non-free non-free-firmware
+"""
+        sources_file = Path(f"/etc/apt/sources.list.d/{self.debian_release}-firmware.list")
+
+        try:
+            # Write sources file
+            subprocess.run(
+                ["tee", str(sources_file)],
+                input=sources_content.encode(),
+                check=True,
+                capture_output=True,
+            )
+
+            # Update apt cache
+            logger.info("Updating apt cache...")
+            subprocess.run(
+                ["apt-get", "update"],
+                check=True,
+                capture_output=True,
+            )
+            self._sources_configured = True
+            logger.info("Apt sources configured successfully")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to configure apt sources: {e.stderr}")
+            # Continue anyway - some packages may still be available
 
     def _load_firmware_sources(self) -> Dict[str, List[str]]:
         """
@@ -111,6 +147,9 @@ class FirmwareManager:
         Raises:
             FirmwareDownloadError: If download fails
         """
+        # Configure apt sources before downloading
+        self._configure_apt_sources()
+
         if vendor not in self.firmware_sources:
             raise FirmwareDownloadError(f"Unknown firmware vendor: {vendor}")
 
@@ -154,7 +193,6 @@ class FirmwareManager:
             return cache_file
 
         # Use apt-get download with proper environment
-        # Ensure apt sources are available for the target release
         env = os.environ.copy()
         env["DEBIAN_FRONTEND"] = "noninteractive"
 
@@ -163,8 +201,6 @@ class FirmwareManager:
                 [
                     "apt-get",
                     "download",
-                    "-t",
-                    self.debian_release,
                     package_name,
                 ],
                 cwd=self.cache_dir,
