@@ -43,24 +43,24 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 - **debian**: trixie-20241202-slim
 
 ### System Dependencies
-**Note**: System dependencies use the latest available versions from Debian Trixie repositories at build time. Version pins were removed due to package unavailability.
+All versions verified as available in `debian:trixie-20241202-slim` (as of 2025-12-19).
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| python3.13 | Latest from Trixie | Python runtime |
-| python3.13-venv | Latest from Trixie | Virtual environment support |
-| python3-pip | Latest from Trixie | Python package installer |
-| wget | Latest from Trixie | File downloader |
-| curl | Latest from Trixie | Transfer tool |
-| xorriso | Latest from Trixie | ISO image creator |
-| isolinux | Latest from Trixie | Boot loader |
-| syslinux | Latest from Trixie | Boot loader suite |
-| syslinux-utils | Latest from Trixie | Syslinux utilities |
-| genisoimage | Latest from Trixie | ISO creation tool |
-| squashfs-tools | Latest from Trixie | SquashFS filesystem tools |
-| sudo | Latest from Trixie | Privilege escalation |
-| ca-certificates | Latest from Trixie | SSL certificates |
-| gnupg | Latest from Trixie | GPG encryption |
+| python3.13 | 3.13.5-2 | Python runtime |
+| python3.13-venv | 3.13.5-2 | Virtual environment support |
+| python3-pip | 25.1.1+dfsg-1 | Python package installer |
+| wget | 1.25.0-2 | File downloader |
+| curl | 8.14.1-2+deb13u2 | Transfer tool |
+| xorriso | 1.5.6-1.2+b1 | ISO image creator |
+| isolinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader |
+| syslinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader suite |
+| syslinux-utils | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Syslinux utilities |
+| genisoimage | 9:1.1.11-4 | ISO creation tool |
+| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
+| sudo | 1.9.16p2-3 | Privilege escalation |
+| ca-certificates | 20250419 | SSL certificates |
+| gnupg | 2.4.7-21 | GPG encryption |
 
 ## GitHub Actions
 
