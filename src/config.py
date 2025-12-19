@@ -18,7 +18,7 @@ class BuildConfig:
     include_nvidia: bool = True
     include_amd: bool = True
     include_intel: bool = True
-    build_arch: List[str] = None
+    build_arch: Optional[List[str]] = None
     output_dir: Path = Path("output")
     work_dir: Path = Path("work")
     firmware_cache: Path = Path("firmware-cache")

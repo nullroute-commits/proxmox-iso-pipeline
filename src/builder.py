@@ -30,7 +30,8 @@ console = Console()
 class ProxmoxISOBuilder:
     """Build custom Proxmox VE installer ISO with firmware."""
 
-    PROXMOX_ISO_BASE_URL = "https://enterprise.proxmox.com/iso/proxmox-ve_{version}.iso"
+    # Using community download URL for public accessibility
+    PROXMOX_ISO_BASE_URL = "https://download.proxmox.com/iso/proxmox-ve_{version}-1.iso"
 
     def __init__(self, config: BuildConfig) -> None:
         """

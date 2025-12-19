@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -152,8 +153,11 @@ class FirmwareManager:
             logger.debug(f"Using cached package: {cache_file}")
             return cache_file
 
-        # Use apt-get download in a container or direct URL
-        # For simplicity, we'll use subprocess with apt-get
+        # Use apt-get download with proper environment
+        # Ensure apt sources are available for the target release
+        env = os.environ.copy()
+        env["DEBIAN_FRONTEND"] = "noninteractive"
+
         try:
             subprocess.run(
                 [
@@ -166,6 +170,7 @@ class FirmwareManager:
                 cwd=self.cache_dir,
                 check=True,
                 capture_output=True,
+                env=env,
             )
 
             # Find the downloaded .deb file
@@ -175,6 +180,11 @@ class FirmwareManager:
 
         except subprocess.CalledProcessError as e:
             logger.error(f"apt-get download failed for {package_name}: {e.stderr}")
+        except FileNotFoundError:
+            logger.error(
+                "apt-get not found. Ensure Debian/Ubuntu environment "
+                "or run within Docker container"
+            )
 
         return None
 
