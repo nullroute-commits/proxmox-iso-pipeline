@@ -137,6 +137,20 @@ def download_firmware(vendor: str, version: str) -> bool:
 - `linux/amd64` - Primary architecture
 - `linux/arm64` - ARM 64-bit support
 
+### Architecture-Specific Package Handling
+The Dockerfile uses divergent architecture flows to handle packages that differ between architectures:
+
+**Architecture-Independent Packages** (same version across all architectures):
+- python3.13, python3.13-venv, python3-pip
+- wget, curl, isolinux, squashfs-tools
+- sudo, ca-certificates, gnupg
+
+**Architecture-Specific Packages** (handled in conditional blocks):
+- **amd64**: xorriso, genisoimage, syslinux, syslinux-utils
+- **arm64**: xorriso, genisoimage (no syslinux - x86-only bootloader)
+
+**Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support. They are not available on ARM64 architecture and are only installed on amd64 builds.
+
 ### BuildKit Configuration
 ```yaml
 services:
@@ -199,19 +213,27 @@ services:
 
 ### Adding New Architecture
 1. Update `docker-compose.yml` platform list
-2. Modify Dockerfile for architecture-specific steps
-3. Test build on new architecture
-4. Update documentation
+2. Modify Dockerfile for architecture-specific steps:
+   - Add architecture detection using `TARGETARCH`
+   - Install shared packages in common block
+   - Handle arch-specific packages in conditional blocks
+   - Document package availability (e.g., syslinux is x86-only)
+3. Pin package versions for the new architecture in VERSIONS.md
+4. Test build on new architecture
+5. Update documentation
 
 ## Best Practices
 
 ### Version Management
 - **Always pin versions** to specific releases (not ranges like `>=`)
-- Document all version pins in VERSIONS.md
+- Document all version pins in VERSIONS.md (includes architecture-specific package tables and commit hashes)
 - Review and update versions monthly for security
 - Test thoroughly after any version updates
-- Use exact versions in Dockerfile (e.g., `python3.13=3.13.0-1`)
-- Pin GitHub Actions to specific tags (e.g., `@v4.2.2`, not `@v4`)
+- Use exact versions in Dockerfile (e.g., `python3.13=3.13.5-2`)
+- Pin GitHub Actions to commit hashes for security (prevents supply chain attacks):
+  ```yaml
+  uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  ```
 
 ### Code Quality
 - Always run `flake8` and `pydocstyle` before committing
@@ -233,6 +255,7 @@ services:
 - Scan containers for vulnerabilities
 - Don't commit secrets or API keys
 - Use environment variables for sensitive data
+- Pin GitHub Actions to commit hashes to prevent supply chain attacks
 
 ## Troubleshooting
 
@@ -246,6 +269,8 @@ services:
 - Ensure Docker buildx is installed and configured
 - Check QEMU emulation is available
 - Verify platform specifications match Docker support
+- Check for architecture-specific package availability (e.g., syslinux is x86-only)
+- Review VERSIONS.md for architecture-specific package versions
 
 ### Firmware Integration Problems
 - Verify firmware package names are correct
@@ -275,6 +300,12 @@ When assisting with this project:
 10. **Keep** Docker images lean and efficient
 
 ## Version History
+- **v1.1.0**: Architecture-specific builds and enhanced security
+  - Divergent architecture flows for Dockerfile (shared vs arch-specific packages)
+  - syslinux/syslinux-utils only installed on amd64 (x86-only bootloader)
+  - All GitHub Actions pinned to commit hashes (prevents supply chain attacks)
+  - Updated pip to 25.3, setuptools to 78.1.1, requests to 2.32.4
+  - VERSIONS.md updated with architecture-specific package tables
 - **v1.0.0**: Initial agent configuration for Proxmox 9.1 ISO pipeline
   - All dependencies pinned to latest stable versions
   - Python 3.13.0 with PEP8/PEP257 compliance
