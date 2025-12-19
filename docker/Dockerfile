@@ -9,22 +9,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Install system dependencies with pinned versions
+# Install system dependencies from Debian Trixie repository
+# Note: Version pins removed as they don't exist in Trixie
+# Latest available versions will be installed
 RUN apt-get update && apt-get install -y \
-    python3.13=3.13.0-1 \
-    python3.13-venv=3.13.0-1 \
-    python3-pip=24.2+dfsg-1 \
-    wget=1.24.5-1 \
-    curl=8.10.1-1 \
-    xorriso=1.5.6-1.1 \
-    isolinux=3:6.04~git20190206.bf6db5b4+dfsg1-5 \
-    syslinux=3:6.04~git20190206.bf6db5b4+dfsg1-5 \
-    syslinux-utils=3:6.04~git20190206.bf6db5b4+dfsg1-5 \
-    genisoimage=9:1.1.11-3.5 \
-    squashfs-tools=1:4.6.1-1 \
-    sudo=1.9.15p5-3 \
-    ca-certificates=20240203 \
-    gnupg=2.2.43-7 \
+    python3.13 \
+    python3.13-venv \
+    python3-pip \
+    wget \
+    curl \
+    xorriso \
+    isolinux \
+    syslinux \
+    syslinux-utils \
+    genisoimage \
+    squashfs-tools \
+    sudo \
+    ca-certificates \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Python environment

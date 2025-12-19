@@ -43,22 +43,24 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 - **debian**: trixie-20241202-slim
 
 ### System Dependencies
+**Note**: System dependencies use the latest available versions from Debian Trixie repositories at build time. Version pins were removed due to package unavailability.
+
 | Package | Version | Purpose |
 |---------|---------|---------|
-| python3.13 | 3.13.0-1 | Python runtime |
-| python3.13-venv | 3.13.0-1 | Virtual environment support |
-| python3-pip | 24.2+dfsg-1 | Python package installer |
-| wget | 1.24.5-1 | File downloader |
-| curl | 8.10.1-1 | Transfer tool |
-| xorriso | 1.5.6-1.1 | ISO image creator |
-| isolinux | 3:6.04~git20190206.bf6db5b4+dfsg1-5 | Boot loader |
-| syslinux | 3:6.04~git20190206.bf6db5b4+dfsg1-5 | Boot loader suite |
-| syslinux-utils | 3:6.04~git20190206.bf6db5b4+dfsg1-5 | Syslinux utilities |
-| genisoimage | 9:1.1.11-3.5 | ISO creation tool |
-| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
-| sudo | 1.9.15p5-3 | Privilege escalation |
-| ca-certificates | 20240203 | SSL certificates |
-| gnupg | 2.2.43-7 | GPG encryption |
+| python3.13 | Latest from Trixie | Python runtime |
+| python3.13-venv | Latest from Trixie | Virtual environment support |
+| python3-pip | Latest from Trixie | Python package installer |
+| wget | Latest from Trixie | File downloader |
+| curl | Latest from Trixie | Transfer tool |
+| xorriso | Latest from Trixie | ISO image creator |
+| isolinux | Latest from Trixie | Boot loader |
+| syslinux | Latest from Trixie | Boot loader suite |
+| syslinux-utils | Latest from Trixie | Syslinux utilities |
+| genisoimage | Latest from Trixie | ISO creation tool |
+| squashfs-tools | Latest from Trixie | SquashFS filesystem tools |
+| sudo | Latest from Trixie | Privilege escalation |
+| ca-certificates | Latest from Trixie | SSL certificates |
+| gnupg | Latest from Trixie | GPG encryption |
 
 ## GitHub Actions
 
