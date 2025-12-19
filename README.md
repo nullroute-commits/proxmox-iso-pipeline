@@ -1,1 +1,418 @@
-# proxmox-iso-pipeline
+# Proxmox ISO Pipeline
+
+[![Build Status](https://github.com/nullroute-commits/proxmox-iso-pipeline/workflows/Build%20Proxmox%20ISO/badge.svg)](https://github.com/nullroute-commits/proxmox-iso-pipeline/actions)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![PEP8](https://img.shields.io/badge/code%20style-pep8-orange.svg)](https://www.python.org/dev/peps/pep-0008/)
+[![PEP257](https://img.shields.io/badge/docstring-pep257-green.svg)](https://www.python.org/dev/peps/pep-0257/)
+[![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)](https://www.docker.com/)
+
+A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trixie) based Proxmox VE 9.1 installer ISOs with integrated firmware support for NVIDIA, AMD, and Intel hardware.
+
+## Features
+
+- 🐍 **Python 3.13.0** - Latest Python with full PEP8 and PEP257 compliance
+- 📌 **Pinned Versions** - All dependencies pinned to latest stable versions (see [VERSIONS.md](VERSIONS.md))
+- 🐳 **Docker Compose** - Multi-container orchestration for streamlined builds
+- 🏗️ **Multi-Architecture** - Support for `linux/amd64` and `linux/arm64`
+- 📀 **Custom ISO Builder** - Automated Proxmox VE installer customization
+- 💾 **Comprehensive Firmware Support**:
+  - ✅ Freeware firmware (linux-firmware, misc-nonfree)
+  - 🎮 NVIDIA proprietary drivers and firmware
+  - 🔴 AMD GPU firmware and microcode
+  - 🔵 Intel microcode and GPU firmware
+- 🤖 **GitHub Copilot Agent** - Optimized for AI-assisted development
+- ⚡ **CI/CD Pipeline** - Automated testing, linting, and multi-arch builds
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│            Proxmox ISO Pipeline                     │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌──────────────┐      ┌──────────────┐            │
+│  │   Python 3.13 │      │    Docker    │            │
+│  │   Builder     │─────▶│   Container  │            │
+│  └──────────────┘      └──────────────┘            │
+│         │                      │                    │
+│         ▼                      ▼                    │
+│  ┌──────────────────────────────────┐              │
+│  │     Firmware Integration         │              │
+│  │  • NVIDIA  • AMD  • Intel        │              │
+│  └──────────────────────────────────┘              │
+│         │                                           │
+│         ▼                                           │
+│  ┌──────────────────────────────────┐              │
+│  │   Multi-Arch ISO Builder         │              │
+│  │   (amd64, arm64)                 │              │
+│  └──────────────────────────────────┘              │
+│         │                                           │
+│         ▼                                           │
+│  ┌──────────────────────────────────┐              │
+│  │   Custom Proxmox 9.1 ISO         │              │
+│  └──────────────────────────────────┘              │
+└─────────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Docker 20.10+ with BuildKit support
+- Docker Compose V2+
+- 20GB+ free disk space
+- Internet connection for downloading Proxmox ISO and firmware
+
+### Using Docker Compose (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/nullroute-commits/proxmox-iso-pipeline.git
+cd proxmox-iso-pipeline
+
+# Build and run with Docker Compose
+docker compose build
+docker compose run --rm builder build
+
+# Or use the convenience script
+chmod +x scripts/build-iso.sh
+./scripts/build-iso.sh all
+```
+
+### Using Python Directly
+
+```bash
+# Install Python 3.13
+# Create virtual environment
+python3.13 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -e .
+
+# Run the builder
+python -m src.builder --help
+python -m src.builder --proxmox-version 9.1 --debian-release trixie
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Proxmox version
+export PROXMOX_VERSION=9.1
+
+# Debian release
+export DEBIAN_RELEASE=trixie
+
+# Firmware inclusion flags
+export INCLUDE_NVIDIA=true
+export INCLUDE_AMD=true
+export INCLUDE_INTEL=true
+
+# Build architecture
+export BUILD_ARCH=linux/amd64,linux/arm64
+
+# Output directories
+export OUTPUT_DIR=./output
+export WORK_DIR=./work
+export FIRMWARE_CACHE=./firmware-cache
+```
+
+### Configuration File
+
+Create a `config.yaml`:
+
+```yaml
+proxmox_version: "9.1"
+debian_release: trixie
+include_nvidia: true
+include_amd: true
+include_intel: true
+build_arch:
+  - linux/amd64
+  - linux/arm64
+output_dir: ./output
+work_dir: ./work
+firmware_cache: ./firmware-cache
+```
+
+Run with config:
+```bash
+python -m src.builder --config config.yaml
+```
+
+## Project Structure
+
+```
+proxmox-iso-pipeline/
+├── .github/
+│   ├── agents/
+│   │   └── agent.md              # GitHub Copilot agent configuration
+│   └── workflows/
+│       └── build-iso.yml         # CI/CD pipeline
+├── src/
+│   ├── __init__.py               # Package initialization
+│   ├── builder.py                # Main ISO builder (PEP8/257 compliant)
+│   ├── firmware.py               # Firmware integration module
+│   └── config.py                 # Configuration management
+├── docker/
+│   ├── Dockerfile                # Multi-stage, multi-arch Dockerfile
+│   └── entrypoint.sh             # Container entrypoint script
+├── scripts/
+│   ├── build-iso.sh              # Main build orchestration script
+│   ├── download-firmware.sh      # Firmware download script
+│   └── inject-firmware.sh        # Firmware injection script
+├── config/
+│   ├── preseed.cfg               # Debian preseed configuration
+│   └── firmware-sources.json     # Firmware package definitions
+├── docker-compose.yml            # Multi-service orchestration
+├── pyproject.toml                # Python project configuration
+├── requirements.txt              # Pinned Python dependencies
+├── .flake8                       # PEP8 linting configuration
+├── .gitignore                    # Git ignore patterns
+├── VERSIONS.md                   # Version pinning documentation
+└── README.md                     # This file
+```
+
+## Usage Examples
+
+### Basic Build
+
+```bash
+# Build with default settings (all firmware included)
+docker compose run --rm builder build
+
+# Check help
+docker compose run --rm builder --help
+```
+
+### Custom Build
+
+```bash
+# Build without NVIDIA firmware
+docker compose run --rm builder build --no-nvidia
+
+# Build with specific Proxmox version
+docker compose run --rm builder build --proxmox-version 9.0
+
+# Build with custom ISO URL
+docker compose run --rm builder build --iso-url https://example.com/custom.iso
+```
+
+### Code Quality Checks
+
+```bash
+# Run linting
+docker compose run --rm linter
+
+# Or manually
+flake8 src/
+pydocstyle src/
+black --check src/
+```
+
+### Multi-Architecture Build
+
+```bash
+# Build for specific architecture
+docker buildx build --platform linux/amd64 -f docker/Dockerfile .
+
+# Build for multiple architectures
+docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile .
+```
+
+## Development
+
+### Setting Up Development Environment
+
+```bash
+# Clone repository
+git clone https://github.com/nullroute-commits/proxmox-iso-pipeline.git
+cd proxmox-iso-pipeline
+
+# Create virtual environment
+python3.13 -m venv venv
+source venv/bin/activate
+
+# Install in development mode
+pip install -e ".[dev]"
+
+# Install pre-commit hooks (optional)
+pip install pre-commit
+pre-commit install
+```
+
+### Code Standards
+
+This project strictly adheres to:
+- **PEP 8**: Python code style guide
+- **PEP 257**: Docstring conventions
+- **Type hints**: All functions include type annotations
+- **Black**: Code formatting (88 character line length)
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=src --cov-report=html
+
+# Run specific test
+pytest tests/test_builder.py -v
+```
+
+### Adding New Firmware
+
+1. Edit `config/firmware-sources.json`:
+```json
+{
+  "custom_vendor": [
+    "package-name-1",
+    "package-name-2"
+  ]
+}
+```
+
+2. Update `src/firmware.py` if needed
+3. Test the changes
+4. Update documentation
+
+## Version Management
+
+All software dependencies are pinned to specific stable versions to ensure reproducible builds and security. See [VERSIONS.md](VERSIONS.md) for the complete list of pinned versions and update procedures.
+
+### Updating Dependencies
+
+```bash
+# Check for outdated Python packages
+pip list --outdated
+
+# Update versions in pyproject.toml and requirements.txt
+# Always test before committing
+
+# Update system packages in Dockerfile
+# Check Debian package versions
+apt-cache policy <package-name>
+```
+
+## GitHub Copilot Integration
+
+This project includes a comprehensive GitHub Copilot agent configuration in `.github/agents/agent.md`. The agent is optimized for:
+
+- Understanding the build pipeline architecture
+- Assisting with Python 3.13 development
+- Managing Docker and multi-arch builds
+- Firmware integration tasks
+- Maintaining PEP8/PEP257 compliance
+
+To use the agent, ensure GitHub Copilot is enabled in your IDE and reference the agent configuration.
+
+## CI/CD Pipeline
+
+The GitHub Actions workflow (`.github/workflows/build-iso.yml`) provides:
+
+1. **Linting**: PEP8, PEP257, Black, mypy checks
+2. **Multi-arch Build**: Docker image for amd64 and arm64
+3. **Testing**: Pytest execution with coverage
+4. **Security Scanning**: Trivy vulnerability scanning
+5. **Release**: Automated release creation on main branch
+
+### Triggering Builds
+
+```bash
+# Push to trigger CI
+git push origin main
+
+# Manual workflow dispatch
+# Go to Actions tab → Build Proxmox ISO → Run workflow
+```
+
+## Firmware Details
+
+### Freeware Firmware
+- `firmware-linux-free` - GPL-licensed firmware
+- `firmware-misc-nonfree` - Redistributable non-free firmware
+- `firmware-linux-nonfree` - Additional non-free firmware
+
+### Proprietary Firmware
+
+#### NVIDIA
+- `nvidia-driver` - NVIDIA graphics driver
+- `nvidia-kernel-dkms` - NVIDIA kernel modules
+- `firmware-nvidia-graphics` - NVIDIA GPU firmware
+
+#### AMD
+- `firmware-amd-graphics` - AMD GPU firmware
+- `amd64-microcode` - AMD CPU microcode updates
+- `firmware-amd-microcode` - Additional AMD microcode
+
+#### Intel
+- `intel-microcode` - Intel CPU microcode updates
+- `firmware-intel-sound` - Intel audio firmware
+- `firmware-intelwimax` - Intel WiMAX firmware
+- `i915-firmware` - Intel graphics firmware
+
+## Troubleshooting
+
+### Build Fails with "Permission Denied"
+
+The container needs privileged mode for ISO mounting:
+```bash
+docker compose run --rm --privileged builder build
+```
+
+### Firmware Download Fails
+
+Check your internet connection and Debian repository availability:
+```bash
+curl -I http://deb.debian.org/debian/
+```
+
+### ISO Too Large
+
+Reduce firmware inclusion:
+```bash
+docker compose run --rm builder build --no-nvidia --no-amd
+```
+
+### Multi-arch Build Issues
+
+Ensure QEMU is properly set up:
+```bash
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Ensure code passes all linting checks
+4. Add tests for new functionality
+5. Update documentation
+6. Submit a pull request
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Acknowledgments
+
+- Proxmox VE team for the excellent virtualization platform
+- Debian project for the stable base system
+- Docker community for containerization tools
+
+## Support
+
+- 📖 Documentation: [.github/agents/agent.md](.github/agents/agent.md)
+- 🐛 Issues: [GitHub Issues](https://github.com/nullroute-commits/proxmox-iso-pipeline/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/nullroute-commits/proxmox-iso-pipeline/discussions)
+
+---
+
+**Built with ❤️ for the Proxmox community**
