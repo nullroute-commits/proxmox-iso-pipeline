@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxmox-iso-pipeline"
+version = "1.0.0"
+description = "Custom Debian 13 Trixie based Proxmox 9.1 installer builder with comprehensive firmware support"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Proxmox ISO Pipeline Contributors"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: System :: Installation/Setup",
+]
+dependencies = [
+    "requests>=2.31.0",
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+    "rich>=13.7.0",
+    "python-debian>=0.1.49",
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8>=7.0.0",
+    "pydocstyle>=6.3.0",
+    "black>=24.0.0",
+    "mypy>=1.8.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[project.scripts]
+proxmox-iso-build = "src.builder:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=src --cov-report=term-missing"
+
+[tool.pydocstyle]
+convention = "google"
+add-ignore = "D100,D104"

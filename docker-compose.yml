@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Main ISO builder service
+  builder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      cache_from:
+        - type=registry,ref=ghcr.io/nullroute-commits/proxmox-iso-builder:cache
+    image: proxmox-iso-builder:latest
+    container_name: proxmox-iso-builder
+    privileged: true  # Required for ISO mounting operations
+    volumes:
+      - ./output:/workspace/output
+      - ./work:/workspace/work
+      - ./firmware-cache:/workspace/firmware-cache
+      - ./config:/workspace/config:ro
+      - ./src:/workspace/src:ro
+    environment:
+      - PROXMOX_VERSION=${PROXMOX_VERSION:-9.1}
+      - DEBIAN_RELEASE=${DEBIAN_RELEASE:-trixie}
+      - INCLUDE_NVIDIA=${INCLUDE_NVIDIA:-true}
+      - INCLUDE_AMD=${INCLUDE_AMD:-true}
+      - INCLUDE_INTEL=${INCLUDE_INTEL:-true}
+      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64}
+    networks:
+      - iso-builder-network
+
+  # Firmware downloader service
+  firmware-downloader:
+    image: proxmox-iso-builder:latest
+    container_name: firmware-downloader
+    volumes:
+      - ./firmware-cache:/workspace/firmware-cache
+      - ./config:/workspace/config:ro
+    environment:
+      - DEBIAN_RELEASE=${DEBIAN_RELEASE:-trixie}
+    command: python -c "from src.firmware import FirmwareManager; import pathlib; fm = FirmwareManager(pathlib.Path('/workspace/firmware-cache'), 'trixie'); print('Firmware manager initialized')"
+    depends_on:
+      - builder
+    networks:
+      - iso-builder-network
+
+  # Linting service for code quality checks
+  linter:
+    image: proxmox-iso-builder:latest
+    container_name: iso-builder-linter
+    volumes:
+      - ./src:/workspace/src:ro
+      - ./.flake8:/workspace/.flake8:ro
+      - ./pyproject.toml:/workspace/pyproject.toml:ro
+    command: lint
+    networks:
+      - iso-builder-network
+
+networks:
+  iso-builder-network:
+    driver: bridge
+
+volumes:
+  output:
+    driver: local
+  work:
+    driver: local
+  firmware-cache:
+    driver: local

@@ -1,0 +1,23 @@
+{
+  "freeware": [
+    "firmware-linux-free",
+    "firmware-misc-nonfree",
+    "firmware-linux-nonfree"
+  ],
+  "nvidia": [
+    "nvidia-driver",
+    "nvidia-kernel-dkms",
+    "firmware-nvidia-graphics"
+  ],
+  "amd": [
+    "firmware-amd-graphics",
+    "amd64-microcode",
+    "firmware-amd-microcode"
+  ],
+  "intel": [
+    "intel-microcode",
+    "firmware-intel-sound",
+    "firmware-intelwimax",
+    "i915-firmware"
+  ]
+}
