@@ -49,34 +49,23 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check if Docker Compose is available
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    print_error "Docker Compose is not installed"
+if ! docker compose version &> /dev/null; then
+    print_error "Docker Compose V2 is not installed"
+    print_info "Please install Docker Compose V2 or upgrade Docker Desktop"
     exit 1
 fi
 
 # Function to build Docker image
 build_image() {
     print_info "Building Docker image..."
-    
-    if docker compose version &> /dev/null; then
-        docker compose build builder
-    else
-        docker-compose build builder
-    fi
-    
+    docker compose build builder
     print_success "Docker image built successfully"
 }
 
 # Function to run linter
 run_linter() {
     print_info "Running code quality checks..."
-    
-    if docker compose version &> /dev/null; then
-        docker compose run --rm linter
-    else
-        docker-compose run --rm linter
-    fi
-    
+    docker compose run --rm linter
     print_success "Code quality checks passed"
 }
 
@@ -100,12 +89,7 @@ build_iso() {
     fi
     
     # Run builder
-    if docker compose version &> /dev/null; then
-        docker compose run --rm builder build $BUILD_ARGS
-    else
-        docker-compose run --rm builder build $BUILD_ARGS
-    fi
-    
+    docker compose run --rm builder build $BUILD_ARGS
     print_success "ISO build completed"
 }
 
