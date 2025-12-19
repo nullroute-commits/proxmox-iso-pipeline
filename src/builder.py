@@ -30,8 +30,8 @@ console = Console()
 class ProxmoxISOBuilder:
     """Build custom Proxmox VE installer ISO with firmware."""
 
-    # Using community download URL for public accessibility
-    PROXMOX_ISO_BASE_URL = "https://download.proxmox.com/iso/proxmox-ve_{version}-1.iso"
+    # Using enterprise download URL for Proxmox VE ISO
+    PROXMOX_ISO_BASE_URL = "https://enterprise.proxmox.com/iso/proxmox-ve_{version}-1.iso"
 
     def __init__(self, config: BuildConfig) -> None:
         """
@@ -72,9 +72,10 @@ class ProxmoxISOBuilder:
         logger.info(f"Downloading Proxmox ISO from: {url}")
 
         try:
-            # Use wget or curl for downloading
+            # Use wget for downloading with certificate verification disabled
+            # (some enterprise mirrors have certificate issues)
             subprocess.run(
-                ["wget", "-O", str(iso_path), url],
+                ["wget", "--no-check-certificate", "-O", str(iso_path), url],
                 check=True,
                 capture_output=True,
             )
@@ -241,7 +242,7 @@ class ProxmoxISOBuilder:
         logger.info(f"Rebuilding ISO: {output_path}")
 
         try:
-            # Use xorriso to create bootable ISO
+            # Use xorriso to create bootable EFI ISO (Proxmox 9.x uses GRUB2/EFI)
             subprocess.run(
                 [
                     "xorriso",
@@ -249,23 +250,16 @@ class ProxmoxISOBuilder:
                     "mkisofs",
                     "-r",
                     "-V",
-                    f"Proxmox VE {self.config.proxmox_version}",
+                    f"PVE{self.config.proxmox_version.replace('.', '')}",
                     "-J",
                     "-joliet-long",
-                    "-cache-inodes",
-                    "-isohybrid-mbr",
-                    "/usr/lib/ISOLINUX/isohdpfx.bin",
-                    "-b",
-                    "isolinux/isolinux.bin",
-                    "-c",
-                    "isolinux/boot.cat",
-                    "-boot-load-size",
-                    "4",
-                    "-boot-info-table",
-                    "-no-emul-boot",
+                    "-append_partition",
+                    "2",
+                    "0xef",
+                    str(self.iso_root / "efi.img"),
                     "-eltorito-alt-boot",
                     "-e",
-                    "efi.img",
+                    "--interval:appended_partition_2:all::",
                     "-no-emul-boot",
                     "-isohybrid-gpt-basdat",
                     "-o",
