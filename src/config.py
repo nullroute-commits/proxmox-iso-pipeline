@@ -95,9 +95,7 @@ class ConfigManager:
                 if config_key in ["include_nvidia", "include_amd", "include_intel"]:
                     data[config_key] = value.lower() in ["true", "1", "yes"]
                 elif config_key == "build_arch":
-                    data[config_key] = [
-                        arch.strip() for arch in value.split(",")
-                    ]
+                    data[config_key] = [arch.strip() for arch in value.split(",")]
                 elif config_key in ["output_dir", "work_dir", "firmware_cache"]:
                     data[config_key] = Path(value)
                 else:

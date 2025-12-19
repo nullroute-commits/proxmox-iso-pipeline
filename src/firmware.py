@@ -8,9 +8,6 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
-from urllib.parse import urljoin
-
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +48,7 @@ class FirmwareManager:
     DEBIAN_REPO_BASE = "http://deb.debian.org/debian"
     FIRMWARE_SOURCES_FILE = "config/firmware-sources.json"
 
-    def __init__(
-        self, cache_dir: Path, debian_release: str = "trixie"
-    ) -> None:
+    def __init__(self, cache_dir: Path, debian_release: str = "trixie") -> None:
         """
         Initialize firmware manager.
 
@@ -101,9 +96,7 @@ class FirmwareManager:
             ],
         }
 
-    def download_firmware(
-        self, vendor: str, force: bool = False
-    ) -> List[Path]:
+    def download_firmware(self, vendor: str, force: bool = False) -> List[Path]:
         """
         Download firmware packages for specified vendor.
 
@@ -132,15 +125,11 @@ class FirmwareManager:
                     downloaded_files.append(file_path)
                     logger.info(f"Downloaded: {file_path}")
             except Exception as e:
-                logger.warning(
-                    f"Failed to download {package_name}: {e}"
-                )
+                logger.warning(f"Failed to download {package_name}: {e}")
                 # Continue with other packages
 
         if not downloaded_files:
-            raise FirmwareDownloadError(
-                f"No firmware packages downloaded for {vendor}"
-            )
+            raise FirmwareDownloadError(f"No firmware packages downloaded for {vendor}")
 
         return downloaded_files
 
@@ -185,15 +174,11 @@ class FirmwareManager:
                 return deb_files[0]
 
         except subprocess.CalledProcessError as e:
-            logger.error(
-                f"apt-get download failed for {package_name}: {e.stderr}"
-            )
+            logger.error(f"apt-get download failed for {package_name}: {e.stderr}")
 
         return None
 
-    def extract_firmware(
-        self, package_path: Path, dest_dir: Path
-    ) -> None:
+    def extract_firmware(self, package_path: Path, dest_dir: Path) -> None:
         """
         Extract firmware files from Debian package.
 
@@ -247,9 +232,7 @@ class FirmwareManager:
         actual_hash = hasher.hexdigest()
         return actual_hash == expected_hash
 
-    def integrate_firmware(
-        self, firmware_files: List[Path], iso_root: Path
-    ) -> None:
+    def integrate_firmware(self, firmware_files: List[Path], iso_root: Path) -> None:
         """
         Integrate firmware files into ISO root.
 
@@ -287,10 +270,6 @@ class FirmwareManager:
 
             except Exception as e:
                 logger.error(f"Failed to integrate {package_path}: {e}")
-                raise FirmwareIntegrationError(
-                    f"Firmware integration failed: {e}"
-                )
+                raise FirmwareIntegrationError(f"Firmware integration failed: {e}")
 
-        logger.info(
-            f"Successfully integrated {len(firmware_files)} firmware packages"
-        )
+        logger.info(f"Successfully integrated {len(firmware_files)} firmware packages")

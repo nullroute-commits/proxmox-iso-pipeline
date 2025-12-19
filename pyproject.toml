@@ -67,4 +67,4 @@ addopts = "-v --cov=src --cov-report=term-missing"
 
 [tool.pydocstyle]
 convention = "google"
-add-ignore = "D100,D104"
+add-ignore = "D100,D104,D212"

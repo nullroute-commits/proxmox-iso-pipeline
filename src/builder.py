@@ -30,9 +30,7 @@ console = Console()
 class ProxmoxISOBuilder:
     """Build custom Proxmox VE installer ISO with firmware."""
 
-    PROXMOX_ISO_BASE_URL = (
-        "https://enterprise.proxmox.com/iso/proxmox-ve_{version}.iso"
-    )
+    PROXMOX_ISO_BASE_URL = "https://enterprise.proxmox.com/iso/proxmox-ve_{version}.iso"
 
     def __init__(self, config: BuildConfig) -> None:
         """
@@ -61,9 +59,7 @@ class ProxmoxISOBuilder:
             RuntimeError: If download fails
         """
         if url is None:
-            url = self.PROXMOX_ISO_BASE_URL.format(
-                version=self.config.proxmox_version
-            )
+            url = self.PROXMOX_ISO_BASE_URL.format(version=self.config.proxmox_version)
 
         iso_filename = f"proxmox-ve_{self.config.proxmox_version}.iso"
         iso_path = self.config.work_dir / iso_filename
@@ -168,9 +164,7 @@ class ProxmoxISOBuilder:
         all_packages: List[Path] = []
 
         with Progress() as progress:
-            task = progress.add_task(
-                "[cyan]Downloading firmware...", total=4
-            )
+            task = progress.add_task("[cyan]Downloading firmware...", total=4)
 
             # Always download freeware firmware
             packages = self.firmware_manager.download_firmware("freeware")
@@ -180,9 +174,7 @@ class ProxmoxISOBuilder:
             # Download vendor-specific firmware if enabled
             if self.config.include_nvidia:
                 try:
-                    packages = self.firmware_manager.download_firmware(
-                        "nvidia"
-                    )
+                    packages = self.firmware_manager.download_firmware("nvidia")
                     all_packages.extend(packages)
                 except Exception as e:
                     logger.warning(f"Failed to download NVIDIA firmware: {e}")
@@ -198,9 +190,7 @@ class ProxmoxISOBuilder:
 
             if self.config.include_intel:
                 try:
-                    packages = self.firmware_manager.download_firmware(
-                        "intel"
-                    )
+                    packages = self.firmware_manager.download_firmware("intel")
                     all_packages.extend(packages)
                 except Exception as e:
                     logger.warning(f"Failed to download Intel firmware: {e}")
@@ -223,9 +213,7 @@ class ProxmoxISOBuilder:
             raise RuntimeError("ISO not extracted yet")
 
         logger.info("Integrating firmware into ISO...")
-        self.firmware_manager.integrate_firmware(
-            firmware_packages, self.iso_root
-        )
+        self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
         logger.info("Firmware integration complete")
 
     def rebuild_iso(self, output_name: Optional[str] = None) -> Path:
@@ -245,9 +233,7 @@ class ProxmoxISOBuilder:
             raise RuntimeError("ISO not extracted yet")
 
         if output_name is None:
-            output_name = (
-                f"proxmox-ve_{self.config.proxmox_version}_custom.iso"
-            )
+            output_name = f"proxmox-ve_{self.config.proxmox_version}_custom.iso"
 
         output_path = self.config.output_dir / output_name
 
@@ -305,9 +291,7 @@ class ProxmoxISOBuilder:
         Returns:
             Path to created custom ISO
         """
-        console.print(
-            "[bold green]Starting Proxmox ISO build process...[/bold green]"
-        )
+        console.print("[bold green]Starting Proxmox ISO build process...[/bold green]")
 
         # Download original ISO
         console.print("[cyan]Step 1/5: Downloading Proxmox ISO[/cyan]")
@@ -329,9 +313,7 @@ class ProxmoxISOBuilder:
         console.print("[cyan]Step 5/5: Rebuilding ISO[/cyan]")
         output_iso = self.rebuild_iso()
 
-        console.print(
-            f"[bold green]Build complete! ISO: {output_iso}[/bold green]"
-        )
+        console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
         return output_iso
 
 
@@ -405,9 +387,7 @@ def main(
         builder = ProxmoxISOBuilder(build_config)
         output_iso = builder.build(iso_url)
 
-        console.print(
-            f"\n[bold green]Success![/bold green] Custom ISO: {output_iso}"
-        )
+        console.print(f"\n[bold green]Success![/bold green] Custom ISO: {output_iso}")
         sys.exit(0)
 
     except Exception as e:
