@@ -10,7 +10,8 @@ A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trix
 
 ## Features
 
-- 🐍 **Python 3.13** - Latest Python with full PEP8 and PEP257 compliance
+- 🐍 **Python 3.13.0** - Latest Python with full PEP8 and PEP257 compliance
+- 📌 **Pinned Versions** - All dependencies pinned to latest stable versions (see [VERSIONS.md](VERSIONS.md))
 - 🐳 **Docker Compose** - Multi-container orchestration for streamlined builds
 - 🏗️ **Multi-Architecture** - Support for `linux/amd64` and `linux/arm64`
 - 📀 **Custom ISO Builder** - Automated Proxmox VE installer customization
@@ -168,8 +169,10 @@ proxmox-iso-pipeline/
 │   └── firmware-sources.json     # Firmware package definitions
 ├── docker-compose.yml            # Multi-service orchestration
 ├── pyproject.toml                # Python project configuration
+├── requirements.txt              # Pinned Python dependencies
 ├── .flake8                       # PEP8 linting configuration
 ├── .gitignore                    # Git ignore patterns
+├── VERSIONS.md                   # Version pinning documentation
 └── README.md                     # This file
 ```
 
@@ -277,6 +280,24 @@ pytest tests/test_builder.py -v
 2. Update `src/firmware.py` if needed
 3. Test the changes
 4. Update documentation
+
+## Version Management
+
+All software dependencies are pinned to specific stable versions to ensure reproducible builds and security. See [VERSIONS.md](VERSIONS.md) for the complete list of pinned versions and update procedures.
+
+### Updating Dependencies
+
+```bash
+# Check for outdated Python packages
+pip list --outdated
+
+# Update versions in pyproject.toml and requirements.txt
+# Always test before committing
+
+# Update system packages in Dockerfile
+# Check Debian package versions
+apt-cache policy <package-name>
+```
 
 ## GitHub Copilot Integration
 

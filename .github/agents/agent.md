@@ -42,13 +42,14 @@ proxmox-iso-pipeline/
 ```
 
 ## Core Technologies
-- **Base OS**: Debian 13 (Trixie)
+- **Base OS**: Debian 13 (Trixie) - debian:trixie-20241202-slim
 - **Target**: Proxmox VE 9.1
-- **Language**: Python 3.13
+- **Language**: Python 3.13.0
 - **Container Runtime**: Docker with BuildKit/buildx
-- **Orchestration**: Docker Compose
+- **Orchestration**: Docker Compose v3.9
 - **CI/CD**: GitHub Actions
 - **Code Standards**: PEP8, PEP257
+- **Version Management**: All dependencies pinned to latest stable versions (see VERSIONS.md)
 
 ## Build Process Overview
 1. **Environment Setup**: Docker container with Debian Trixie base
@@ -204,6 +205,14 @@ services:
 
 ## Best Practices
 
+### Version Management
+- **Always pin versions** to specific releases (not ranges like `>=`)
+- Document all version pins in VERSIONS.md
+- Review and update versions monthly for security
+- Test thoroughly after any version updates
+- Use exact versions in Dockerfile (e.g., `python3.13=3.13.0-1`)
+- Pin GitHub Actions to specific tags (e.g., `@v4.2.2`, not `@v4`)
+
 ### Code Quality
 - Always run `flake8` and `pydocstyle` before committing
 - Use type hints for all function parameters and returns
@@ -267,3 +276,7 @@ When assisting with this project:
 
 ## Version History
 - **v1.0.0**: Initial agent configuration for Proxmox 9.1 ISO pipeline
+  - All dependencies pinned to latest stable versions
+  - Python 3.13.0 with PEP8/PEP257 compliance
+  - Multi-arch Docker support (amd64, arm64)
+  - Comprehensive firmware integration (NVIDIA, AMD, Intel)
