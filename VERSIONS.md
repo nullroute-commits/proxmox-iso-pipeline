@@ -54,7 +54,6 @@ All versions are pinned for reproducibility. Some packages have architecture-spe
 | wget | 1.25.0-2 | File downloader |
 | curl | 8.14.1-2+deb13u2 | Transfer tool |
 | isolinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader (arch: all) |
-| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
 | sudo | 1.9.16p2-3 | Privilege escalation |
 | ca-certificates | 20250419 | SSL certificates |
 | gnupg | 2.4.7-21 | GPG encryption |
@@ -64,6 +63,7 @@ All versions are pinned for reproducibility. Some packages have architecture-spe
 |---------|---------|---------|
 | xorriso | 1.5.6-1.2+b1 | ISO image creator |
 | genisoimage | 9:1.1.11-4 | ISO creation tool |
+| squashfs-tools | 1:4.6.1-1 | SquashFS filesystem tools |
 | syslinux | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Boot loader suite (legacy BIOS) |
 | syslinux-utils | 3:6.04~git20190206.bf6db5b4+dfsg1-3.1 | Syslinux utilities |
 
@@ -72,9 +72,11 @@ All versions are pinned for reproducibility. Some packages have architecture-spe
 |---------|---------|---------|
 | xorriso | 1.5.6-1.2+b1 | ISO image creator |
 | genisoimage | 9:1.1.11-4 | ISO creation tool |
+| squashfs-tools | 1:4.6.1-1+b1 | SquashFS filesystem tools |
 
 **Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support.
 They are not available on ARM64 architecture and are only installed on amd64 builds.
+`squashfs-tools` has different binary rebuild versions between amd64 and arm64.
 
 ## GitHub Actions
 

@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     wget=1.25.0-2 \
     curl=8.14.1-2+deb13u2 \
     isolinux=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
-    squashfs-tools=1:4.6.1-1 \
     sudo=1.9.16p2-3 \
     ca-certificates=20250419 \
     gnupg=2.4.7-21 \
@@ -36,14 +35,17 @@ RUN apt-get update && \
         apt-get install -y \
             xorriso=1.5.6-1.2+b1 \
             genisoimage=9:1.1.11-4 \
+            squashfs-tools=1:4.6.1-1 \
             syslinux=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
             syslinux-utils=3:6.04~git20190206.bf6db5b4+dfsg1-3.1; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         # arm64-specific packages with pinned versions
         # Note: syslinux is not available on arm64 (x86-only bootloader)
+        # Note: squashfs-tools has arch-specific binary rebuild on arm64
         apt-get install -y \
             xorriso=1.5.6-1.2+b1 \
-            genisoimage=9:1.1.11-4; \
+            genisoimage=9:1.1.11-4 \
+            squashfs-tools=1:4.6.1-1+b1; \
     fi && \
     rm -rf /var/lib/apt/lists/*
 
