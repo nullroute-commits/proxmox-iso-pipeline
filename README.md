@@ -472,9 +472,22 @@ MIT License - See LICENSE file for details
 - Debian project for the stable base system
 - Docker community for containerization tools
 
+## Documentation
+
+For comprehensive documentation, see the [docs/](docs/) directory:
+
+- 📖 [Documentation Index](docs/README.md) - Start here
+- 👤 [User Guide](docs/user-guide.md) - Getting started and basic usage
+- 🔧 [Operator Guide](docs/operator-guide.md) - Deployment and CI/CD
+- 💻 [Developer Guide](docs/developer-guide.md) - Contributing
+- 🏗️ [Architecture](docs/architecture.md) - System design
+- ⚙️ [Configuration Reference](docs/configuration.md) - All options
+- 🔍 [Troubleshooting](docs/troubleshooting.md) - Common issues
+- 📚 [API Reference](docs/api-reference.md) - Python API
+
 ## Support
 
-- 📖 Documentation: [.github/agents/agent.md](.github/agents/agent.md)
+- 📖 Documentation: [docs/](docs/README.md)
 - 🐛 Issues: [GitHub Issues](https://github.com/nullroute-commits/proxmox-iso-pipeline/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/nullroute-commits/proxmox-iso-pipeline/discussions)
 
