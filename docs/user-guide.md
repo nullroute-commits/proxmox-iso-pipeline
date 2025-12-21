@@ -84,6 +84,8 @@ ls -la output/
 
 ### Step 1: Clone the Repository
 
+If you haven't already, clone the repository:
+
 ```bash
 git clone https://github.com/nullroute-commits/proxmox-iso-pipeline.git
 cd proxmox-iso-pipeline

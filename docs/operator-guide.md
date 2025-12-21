@@ -118,7 +118,7 @@ variables:
 
 lint:
   stage: lint
-  image: python:3.13-slim
+  image: python:3.13.0-slim
   script:
     - pip install flake8==7.1.1 pydocstyle==6.3.0 black==24.10.0
     - flake8 src/

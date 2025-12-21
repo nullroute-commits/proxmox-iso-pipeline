@@ -40,16 +40,16 @@ df -h . | tail -1 | awk '{print $4 " available"}'
 
 # Check Python (if running locally)
 echo -n "Python: "
-python3.13 --version 2>/dev/null || python3 --version 2>/dev/null || echo "NOT FOUND"
+python3 --version 2>/dev/null | grep -q "3.13" && python3 --version || echo "3.13.x NOT FOUND"
 
 # Check network
 echo -n "Network (Proxmox): "
-curl -s -o /dev/null -w "%{http_code}" https://enterprise.proxmox.com 2>/dev/null || echo "FAILED"
-echo ""
+status=$(curl -s -o /dev/null -w "%{http_code}" https://enterprise.proxmox.com 2>/dev/null)
+[ -n "$status" ] && echo "$status" || echo "FAILED"
 
 echo -n "Network (Debian): "
-curl -s -o /dev/null -w "%{http_code}" http://deb.debian.org 2>/dev/null || echo "FAILED"
-echo ""
+status=$(curl -s -o /dev/null -w "%{http_code}" http://deb.debian.org 2>/dev/null)
+[ -n "$status" ] && echo "$status" || echo "FAILED"
 
 # Check directories
 echo "Directories:"
