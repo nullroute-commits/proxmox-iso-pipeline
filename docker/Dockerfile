@@ -93,6 +93,7 @@ ARG PYTHON_VERSION=3.13.5
 ARG PROXMOX_VERSION=9.1
 ARG DEBIAN_RELEASE=trixie
 ARG ARCHITECTURES=amd64,arm64
+# BASE_IMAGE must be redeclared in this stage to be available for labels
 ARG BASE_IMAGE=debian:trixie-20241202-slim
 
 # Add OCI-compliant image labels
