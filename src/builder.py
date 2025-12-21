@@ -31,7 +31,9 @@ class ProxmoxISOBuilder:
     """Build custom Proxmox VE installer ISO with firmware."""
 
     # Using enterprise download URL for Proxmox VE ISO
-    PROXMOX_ISO_BASE_URL = "https://enterprise.proxmox.com/iso/proxmox-ve_{version}-1.iso"
+    PROXMOX_ISO_BASE_URL = (
+        "https://enterprise.proxmox.com/iso/proxmox-ve_{version}-1.iso"
+    )
 
     def __init__(self, config: BuildConfig) -> None:
         """
@@ -218,9 +220,81 @@ class ProxmoxISOBuilder:
         self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
         logger.info("Firmware integration complete")
 
+    def validate_boot_files(self) -> bool:
+        """
+        Validate that required boot files exist in the ISO.
+
+        Returns:
+            True if all required boot files exist
+
+        Raises:
+            RuntimeError: If ISO root is not set or boot files are missing
+        """
+        if self.iso_root is None:
+            raise RuntimeError("ISO not extracted yet")
+
+        logger.info("Validating boot files...")
+
+        # Check for EFI boot files
+        efi_img = self.iso_root / "efi.img"
+        if not efi_img.exists():
+            raise RuntimeError(
+                f"EFI boot image not found: {efi_img}\n"
+                "The ISO may not be compatible with UEFI/Secure Boot"
+            )
+
+        # Check for BIOS boot files (isolinux)
+        isolinux_bin = self.iso_root / "isolinux" / "isolinux.bin"
+        if isolinux_bin.exists():
+            logger.info("BIOS boot support: isolinux.bin found")
+        else:
+            logger.info("BIOS boot files not found - ISO will only support UEFI mode")
+
+        # Check for GRUB configuration
+        grub_cfg_paths = [
+            self.iso_root / "boot" / "grub" / "grub.cfg",
+            self.iso_root / "boot" / "grub" / "loopback.cfg",
+        ]
+        grub_found = any(p.exists() for p in grub_cfg_paths)
+        if not grub_found:
+            logger.warning("GRUB configuration not found")
+
+        logger.info("Boot file validation complete")
+        return True
+
+    def _find_mbr_template(self) -> Optional[Path]:
+        """
+        Find MBR template file for hybrid boot.
+
+        Returns:
+            Path to MBR template if found, None otherwise
+        """
+        mbr_template_paths = [
+            Path("/usr/lib/ISOLINUX/isohdpfx.bin"),  # Debian/Ubuntu
+            Path("/usr/lib/syslinux/bios/isohdpfx.bin"),  # Arch/Fedora
+            Path("/usr/share/syslinux/isohdpfx.bin"),  # Alternative
+            Path("/usr/lib/syslinux/isohdpfx.bin"),  # Older systems
+        ]
+
+        for mbr_path in mbr_template_paths:
+            if mbr_path.exists():
+                logger.debug(f"Found MBR template: {mbr_path}")
+                return mbr_path
+
+        logger.info(
+            "MBR template not found - ISO may not boot properly "
+            "from USB in BIOS mode"
+        )
+        return None
+
     def rebuild_iso(self, output_name: Optional[str] = None) -> Path:
         """
-        Rebuild ISO from modified contents.
+        Rebuild ISO from modified contents with hybrid BIOS/UEFI boot support.
+
+        Creates a bootable ISO that supports:
+        - UEFI boot (including Secure Boot compatibility)
+        - Legacy BIOS boot (via isolinux)
+        - USB/hybrid boot modes
 
         Args:
             output_name: Optional custom output ISO name
@@ -241,40 +315,87 @@ class ProxmoxISOBuilder:
 
         logger.info(f"Rebuilding ISO: {output_path}")
 
-        try:
-            # Use xorriso to create bootable EFI ISO (Proxmox 9.x uses GRUB2/EFI)
-            subprocess.run(
+        # Validate boot files exist
+        self.validate_boot_files()
+
+        # Check which boot modes are available
+        has_isolinux = (self.iso_root / "isolinux" / "isolinux.bin").exists()
+        has_efi = (self.iso_root / "efi.img").exists()
+
+        # Build xorriso command with hybrid boot support
+        xorriso_cmd = [
+            "xorriso",
+            "-as",
+            "mkisofs",
+            "-r",  # Rock Ridge extensions for POSIX compatibility
+            "-V",
+            f"PVE{self.config.proxmox_version.replace('.', '')}",
+            "-J",  # Joliet extensions for Windows compatibility
+            "-joliet-long",  # Allow longer Joliet filenames
+        ]
+
+        # Add BIOS boot support if isolinux is available
+        if has_isolinux:
+            logger.info("Adding BIOS boot support (isolinux)")
+            xorriso_cmd.extend(
                 [
-                    "xorriso",
-                    "-as",
-                    "mkisofs",
-                    "-r",
-                    "-V",
-                    f"PVE{self.config.proxmox_version.replace('.', '')}",
-                    "-J",
-                    "-joliet-long",
-                    "-append_partition",
-                    "2",
-                    "0xef",
-                    str(self.iso_root / "efi.img"),
-                    "-eltorito-alt-boot",
-                    "-e",
-                    "--interval:appended_partition_2:all::",
-                    "-no-emul-boot",
-                    "-isohybrid-gpt-basdat",
-                    "-o",
-                    str(output_path),
-                    str(self.iso_root),
-                ],
-                check=True,
-                capture_output=True,
+                    "-b",
+                    "isolinux/isolinux.bin",  # BIOS boot image
+                    "-c",
+                    "isolinux/boot.cat",  # Boot catalog
+                    "-no-emul-boot",  # No emulation mode
+                    "-boot-load-size",
+                    "4",  # Load 4 sectors
+                    "-boot-info-table",  # Add boot info table
+                ]
             )
 
+            # Add MBR template for hybrid boot if available
+            mbr_template = self._find_mbr_template()
+            if mbr_template:
+                xorriso_cmd.extend(["-isohybrid-mbr", str(mbr_template)])
+
+        # Add UEFI boot support
+        if has_efi:
+            logger.info("Adding UEFI boot support (Secure Boot compatible)")
+            xorriso_cmd.extend(
+                [
+                    "-eltorito-alt-boot",  # Alternate boot entry
+                    "-e",
+                    "efi.img",  # EFI boot image
+                    "-no-emul-boot",  # No emulation mode
+                    "-append_partition",
+                    "2",  # Partition number
+                    "0xef",  # EFI System Partition type
+                    str(self.iso_root / "efi.img"),
+                    "-isohybrid-gpt-basdat",  # GPT partition for hybrid ISO
+                ]
+            )
+
+        # Add output path and source directory
+        xorriso_cmd.extend(["-o", str(output_path), str(self.iso_root)])
+
+        try:
+            logger.debug(f"Running xorriso command: {' '.join(xorriso_cmd)}")
+            result = subprocess.run(
+                xorriso_cmd, check=True, capture_output=True, text=True
+            )
+
+            # Log xorriso output for debugging
+            if result.stdout:
+                logger.debug(f"xorriso output: {result.stdout}")
+
             logger.info(f"ISO created successfully: {output_path}")
+            logger.info(
+                f"Boot modes: BIOS={'yes' if has_isolinux else 'no'}, "
+                f"UEFI={'yes' if has_efi else 'no'}"
+            )
             return output_path
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to rebuild ISO: {e.stderr}")
+            error_msg = f"Failed to rebuild ISO: {e.stderr if e.stderr else str(e)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
     def build(self, iso_url: Optional[str] = None) -> Path:
         """

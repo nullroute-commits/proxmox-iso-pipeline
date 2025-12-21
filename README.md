@@ -15,6 +15,11 @@ A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trix
 - 🐳 **Docker Compose** - Multi-container orchestration for streamlined builds
 - 🏗️ **Multi-Architecture** - Support for `linux/amd64` and `linux/arm64`
 - 📀 **Custom ISO Builder** - Automated Proxmox VE installer customization
+- 🔐 **Hybrid Boot Support**:
+  - ✅ UEFI/EFI boot with Secure Boot compatibility
+  - ✅ Legacy BIOS boot support (isolinux)
+  - ✅ Hybrid ISO format for USB/CD boot
+  - ✅ GPT and MBR partition tables
 - 💾 **Comprehensive Firmware Support**:
   - ✅ Freeware firmware (linux-firmware, misc-nonfree)
   - 🎮 NVIDIA proprietary drivers and firmware
@@ -356,6 +361,43 @@ git push origin main
 - `firmware-intelwimax` - Intel WiMAX firmware
 - `i915-firmware` - Intel graphics firmware
 
+## Boot Compatibility
+
+### Secure Boot Support
+
+The generated ISOs are fully compatible with UEFI Secure Boot:
+
+- **EFI Boot**: Uses signed GRUB2 bootloader (grubx64.efi) compatible with Secure Boot
+- **Boot Image**: Includes efi.img with proper EFI System Partition (ESP) structure
+- **Validation**: Automatically validates boot files before ISO creation
+
+### Hybrid Boot Mode
+
+The ISOs support multiple boot modes for maximum compatibility:
+
+1. **UEFI Mode** (Secure Boot compatible)
+   - Modern systems with UEFI firmware
+   - Secure Boot enabled systems
+   - GPT-partitioned disks
+
+2. **Legacy BIOS Mode**
+   - Older systems without UEFI
+   - MBR-partitioned disks
+   - Uses isolinux bootloader
+
+3. **Hybrid USB Boot**
+   - Works as both UEFI and BIOS bootable USB
+   - Includes both MBR and GPT partition tables
+   - Supports dd writing to USB devices
+
+### Boot Verification
+
+The build process automatically:
+- Validates presence of efi.img for UEFI boot
+- Checks for isolinux.bin for BIOS boot
+- Verifies GRUB configuration files
+- Logs available boot modes
+
 ## Troubleshooting
 
 ### Build Fails with "Permission Denied"
@@ -385,6 +427,29 @@ Ensure QEMU is properly set up:
 ```bash
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
+
+### ISO Won't Boot
+
+If the generated ISO fails to boot:
+
+1. **Check boot mode**: Ensure your system supports the boot mode (UEFI vs BIOS)
+2. **Verify Secure Boot**: On Secure Boot systems, ensure the ISO has EFI boot support
+3. **USB Boot**: Use proper USB writing tools:
+   ```bash
+   # Linux/macOS
+   sudo dd if=proxmox-ve_9.1_custom.iso of=/dev/sdX bs=4M status=progress
+   
+   # Windows - use Rufus or similar tool in DD mode
+   ```
+4. **Check logs**: Review build logs for boot validation warnings
+5. **Test in VM**: Verify ISO boots in both UEFI and BIOS modes using QEMU:
+   ```bash
+   # UEFI mode
+   qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -cdrom output/proxmox-ve_9.1_custom.iso -m 4G
+   
+   # BIOS mode
+   qemu-system-x86_64 -cdrom output/proxmox-ve_9.1_custom.iso -m 4G
+   ```
 
 ## Contributing
 

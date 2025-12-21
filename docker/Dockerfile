@@ -103,7 +103,9 @@ RUN chmod +x /entrypoint.sh
 
 # Create non-root user for running the application
 RUN useradd -m -u 1000 builder && \
-    chown -R builder:builder /workspace
+    chown -R builder:builder /workspace && \
+    echo "# Allow builder to run specific commands for ISO operations" >> /etc/sudoers && \
+    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod" >> /etc/sudoers
 
 # Set default user
 USER builder

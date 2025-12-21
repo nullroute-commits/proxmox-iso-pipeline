@@ -71,10 +71,15 @@ class FirmwareManager:
         logger.info(f"Configuring apt sources for {self.debian_release}")
 
         # Create sources list for the target release including non-free
-        sources_content = f"""deb {self.DEBIAN_REPO_BASE} {self.debian_release} main contrib non-free non-free-firmware
-deb {self.DEBIAN_REPO_BASE} {self.debian_release}-updates main contrib non-free non-free-firmware
-"""
-        sources_file = Path(f"/etc/apt/sources.list.d/{self.debian_release}-firmware.list")
+        sources_content = (
+            f"deb {self.DEBIAN_REPO_BASE} {self.debian_release} "
+            "main contrib non-free non-free-firmware\n"
+            f"deb {self.DEBIAN_REPO_BASE} {self.debian_release}-updates "
+            "main contrib non-free non-free-firmware\n"
+        )
+        sources_file = Path(
+            f"/etc/apt/sources.list.d/{self.debian_release}-firmware.list"
+        )
 
         try:
             # Write sources file
