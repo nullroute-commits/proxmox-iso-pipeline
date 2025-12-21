@@ -248,7 +248,7 @@ class ProxmoxISOBuilder:
         if isolinux_bin.exists():
             logger.info("BIOS boot support: isolinux.bin found")
         else:
-            logger.warning("BIOS boot files not found - ISO may only boot in UEFI mode")
+            logger.info("BIOS boot files not found - ISO will only support UEFI mode")
 
         # Check for GRUB configuration
         grub_cfg_paths = [
@@ -261,6 +261,31 @@ class ProxmoxISOBuilder:
 
         logger.info("Boot file validation complete")
         return True
+
+    def _find_mbr_template(self) -> Optional[Path]:
+        """
+        Find MBR template file for hybrid boot.
+
+        Returns:
+            Path to MBR template if found, None otherwise
+        """
+        mbr_template_paths = [
+            Path("/usr/lib/ISOLINUX/isohdpfx.bin"),  # Debian/Ubuntu
+            Path("/usr/lib/syslinux/bios/isohdpfx.bin"),  # Arch/Fedora
+            Path("/usr/share/syslinux/isohdpfx.bin"),  # Alternative
+            Path("/usr/lib/syslinux/isohdpfx.bin"),  # Older systems
+        ]
+
+        for mbr_path in mbr_template_paths:
+            if mbr_path.exists():
+                logger.debug(f"Found MBR template: {mbr_path}")
+                return mbr_path
+
+        logger.info(
+            "MBR template not found - ISO may not boot properly "
+            "from USB in BIOS mode"
+        )
+        return None
 
     def rebuild_iso(self, output_name: Optional[str] = None) -> Path:
         """
@@ -326,14 +351,9 @@ class ProxmoxISOBuilder:
             )
 
             # Add MBR template for hybrid boot if available
-            mbr_template = Path("/usr/lib/ISOLINUX/isohdpfx.bin")
-            if mbr_template.exists():
+            mbr_template = self._find_mbr_template()
+            if mbr_template:
                 xorriso_cmd.extend(["-isohybrid-mbr", str(mbr_template)])
-            else:
-                # Try alternative location
-                mbr_template = Path("/usr/lib/syslinux/bios/isohdpfx.bin")
-                if mbr_template.exists():
-                    xorriso_cmd.extend(["-isohybrid-mbr", str(mbr_template)])
 
         # Add UEFI boot support
         if has_efi:
