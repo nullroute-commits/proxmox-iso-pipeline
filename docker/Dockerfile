@@ -3,7 +3,8 @@
 # All package versions are pinned for reproducibility
 
 # Stage 1: Base build environment
-FROM debian:trixie-20241202-slim AS base
+ARG BASE_IMAGE=debian:trixie-20241202-slim
+FROM ${BASE_IMAGE} AS base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -85,6 +86,37 @@ RUN mkdir -p /build/output /build/work /build/firmware-cache
 
 # Stage 4: Final runtime image
 FROM base AS runtime
+
+# Build arguments for dynamic labeling
+ARG IMAGE_VERSION=1.0.0
+ARG PYTHON_VERSION=3.13.5
+ARG PROXMOX_VERSION=9.1
+ARG DEBIAN_RELEASE=trixie
+ARG ARCHITECTURES=amd64,arm64
+# BASE_IMAGE must be redeclared in this stage to be available for labels
+ARG BASE_IMAGE
+
+# Add OCI-compliant image labels
+LABEL org.opencontainers.image.title="Proxmox ISO Pipeline Builder" \
+      org.opencontainers.image.description="Custom Debian ${DEBIAN_RELEASE} based Proxmox VE ${PROXMOX_VERSION} installer builder with comprehensive firmware support for NVIDIA, AMD, and Intel hardware" \
+      org.opencontainers.image.version="${IMAGE_VERSION}" \
+      org.opencontainers.image.authors="Proxmox ISO Pipeline Contributors" \
+      org.opencontainers.image.vendor="nullroute-commits" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/nullroute-commits/proxmox-iso-pipeline" \
+      org.opencontainers.image.source="https://github.com/nullroute-commits/proxmox-iso-pipeline" \
+      org.opencontainers.image.documentation="https://github.com/nullroute-commits/proxmox-iso-pipeline#readme" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      maintainer="Proxmox ISO Pipeline Contributors"
+
+# Additional build metadata labels
+LABEL org.proxmox_iso_pipeline.python.version="${PYTHON_VERSION}" \
+      org.proxmox_iso_pipeline.debian.release="${DEBIAN_RELEASE}" \
+      org.proxmox_iso_pipeline.proxmox.version="${PROXMOX_VERSION}" \
+      org.proxmox_iso_pipeline.supports.architectures="${ARCHITECTURES}" \
+      org.proxmox_iso_pipeline.firmware.nvidia="supported" \
+      org.proxmox_iso_pipeline.firmware.amd="supported" \
+      org.proxmox_iso_pipeline.firmware.intel="supported"
 
 WORKDIR /workspace
 
