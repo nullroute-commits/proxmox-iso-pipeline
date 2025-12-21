@@ -86,6 +86,28 @@ RUN mkdir -p /build/output /build/work /build/firmware-cache
 # Stage 4: Final runtime image
 FROM base AS runtime
 
+# Add OCI-compliant image labels
+LABEL org.opencontainers.image.title="Proxmox ISO Pipeline Builder" \
+      org.opencontainers.image.description="Custom Debian 13 Trixie based Proxmox VE 9.1 installer builder with comprehensive firmware support for NVIDIA, AMD, and Intel hardware" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.authors="Proxmox ISO Pipeline Contributors" \
+      org.opencontainers.image.vendor="nullroute-commits" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/nullroute-commits/proxmox-iso-pipeline" \
+      org.opencontainers.image.source="https://github.com/nullroute-commits/proxmox-iso-pipeline" \
+      org.opencontainers.image.documentation="https://github.com/nullroute-commits/proxmox-iso-pipeline#readme" \
+      org.opencontainers.image.base.name="debian:trixie-20241202-slim" \
+      maintainer="Proxmox ISO Pipeline Contributors"
+
+# Additional build metadata labels
+LABEL org.proxmox-iso-pipeline.python.version="3.13.5" \
+      org.proxmox-iso-pipeline.debian.release="trixie" \
+      org.proxmox-iso-pipeline.proxmox.version="9.1" \
+      org.proxmox-iso-pipeline.supports.architectures="amd64,arm64" \
+      org.proxmox-iso-pipeline.firmware.nvidia="supported" \
+      org.proxmox-iso-pipeline.firmware.amd="supported" \
+      org.proxmox-iso-pipeline.firmware.intel="supported"
+
 WORKDIR /workspace
 
 # Copy virtual environment
