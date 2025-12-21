@@ -91,10 +91,11 @@ ARG IMAGE_VERSION=1.0.0
 ARG PYTHON_VERSION=3.13.5
 ARG PROXMOX_VERSION=9.1
 ARG DEBIAN_RELEASE=trixie
+ARG ARCHITECTURES=amd64,arm64
 
 # Add OCI-compliant image labels
 LABEL org.opencontainers.image.title="Proxmox ISO Pipeline Builder" \
-      org.opencontainers.image.description="Custom Debian 13 Trixie based Proxmox VE 9.1 installer builder with comprehensive firmware support for NVIDIA, AMD, and Intel hardware" \
+      org.opencontainers.image.description="Custom Debian ${DEBIAN_RELEASE} based Proxmox VE ${PROXMOX_VERSION} installer builder with comprehensive firmware support for NVIDIA, AMD, and Intel hardware" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.authors="Proxmox ISO Pipeline Contributors" \
       org.opencontainers.image.vendor="nullroute-commits" \
@@ -109,7 +110,7 @@ LABEL org.opencontainers.image.title="Proxmox ISO Pipeline Builder" \
 LABEL org.proxmox-iso-pipeline.python.version="${PYTHON_VERSION}" \
       org.proxmox-iso-pipeline.debian.release="${DEBIAN_RELEASE}" \
       org.proxmox-iso-pipeline.proxmox.version="${PROXMOX_VERSION}" \
-      org.proxmox-iso-pipeline.supports.architectures="amd64,arm64" \
+      org.proxmox-iso-pipeline.supports.architectures="${ARCHITECTURES}" \
       org.proxmox-iso-pipeline.firmware.nvidia="supported" \
       org.proxmox-iso-pipeline.firmware.amd="supported" \
       org.proxmox-iso-pipeline.firmware.intel="supported"
