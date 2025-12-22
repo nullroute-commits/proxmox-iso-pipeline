@@ -12,6 +12,7 @@ Python API documentation for the Proxmox ISO Pipeline modules.
 - [src.builder](#srcbuilder)
 - [src.firmware](#srcfirmware)
 - [src.config](#srcconfig)
+- [src.performance](#srcperformance)
 - [Exceptions](#exceptions)
 - [Type Definitions](#type-definitions)
 
@@ -22,7 +23,8 @@ src/
 ├── __init__.py      # Package initialization
 ├── builder.py       # Main ISO builder logic
 ├── firmware.py      # Firmware download and integration
-└── config.py        # Configuration management
+├── config.py        # Configuration management
+└── performance.py   # Performance timing utilities
 ```
 
 ### Import Examples
@@ -36,6 +38,13 @@ from src.firmware import FirmwareManager, FirmwareError
 
 # Import configuration
 from src.config import BuildConfig, ConfigManager
+
+# Import performance utilities
+from src.performance import (
+    PerformanceTracker,
+    track_performance,
+    get_performance_tracker,
+)
 ```
 
 ## src.builder
@@ -609,6 +618,246 @@ def validate(self) -> bool:
         >>> is_valid = cm.validate()
         >>> print(is_valid)
         True
+    """
+```
+
+## src.performance
+
+Performance timing utilities for tracking build stages and actions.
+
+### Class: TimingRecord
+
+```python
+@dataclass
+class TimingRecord:
+    """
+    Record of a single timed operation.
+
+    Attributes:
+        name: Name of the operation being timed
+        stage: Stage category for the operation
+        start_time: Unix timestamp when timing started
+        end_time: Unix timestamp when timing ended (None if still running)
+        duration: Duration in seconds (None if still running)
+    """
+    name: str
+    stage: str
+    start_time: float
+    end_time: Optional[float] = None
+    duration: Optional[float] = None
+
+    def complete(self) -> None:
+        """Mark the timing record as complete."""
+```
+
+### Class: PerformanceTracker
+
+```python
+class PerformanceTracker:
+    """Track and report performance metrics for build stages and actions."""
+```
+
+#### Constructor
+
+```python
+def __init__(self) -> None:
+    """
+    Initialize performance tracker.
+
+    Example:
+        >>> from src.performance import PerformanceTracker
+        >>> tracker = PerformanceTracker()
+    """
+```
+
+#### Methods
+
+##### start_timer
+
+```python
+def start_timer(self, name: str, stage: str = "default") -> TimingRecord:
+    """
+    Start a timer for a named operation.
+
+    Args:
+        name: Name of the operation being timed.
+        stage: Stage category for the operation.
+
+    Returns:
+        TimingRecord for the started timer.
+
+    Example:
+        >>> record = tracker.start_timer("download_iso", "download")
+    """
+```
+
+##### stop_timer
+
+```python
+def stop_timer(self, name: str, stage: str = "default") -> Optional[TimingRecord]:
+    """
+    Stop a timer for a named operation.
+
+    Args:
+        name: Name of the operation.
+        stage: Stage category for the operation.
+
+    Returns:
+        Completed TimingRecord or None if timer not found.
+
+    Example:
+        >>> record = tracker.stop_timer("download_iso", "download")
+        >>> print(record.duration)
+        45.23
+    """
+```
+
+##### track (context manager)
+
+```python
+@contextmanager
+def track(
+    self, name: str, stage: str = "default"
+) -> Generator[TimingRecord, None, None]:
+    """
+    Context manager for tracking execution time of an operation.
+
+    Args:
+        name: Name of the operation being timed.
+        stage: Stage category for the operation.
+
+    Yields:
+        TimingRecord for the operation.
+
+    Example:
+        >>> with tracker.track("extract_iso", "extract") as record:
+        ...     # perform extraction
+        ...     pass
+        >>> print(record.duration)
+        12.5
+    """
+```
+
+##### get_stage_summary
+
+```python
+def get_stage_summary(self) -> Dict[str, float]:
+    """
+    Get total time spent in each stage.
+
+    Returns:
+        Dictionary mapping stage names to total duration in seconds.
+
+    Example:
+        >>> summary = tracker.get_stage_summary()
+        >>> print(summary)
+        {'download': 45.2, 'extract': 12.5, 'firmware': 30.1}
+    """
+```
+
+##### get_total_time
+
+```python
+def get_total_time(self) -> float:
+    """
+    Get total time for all recorded operations.
+
+    Returns:
+        Total duration in seconds.
+
+    Example:
+        >>> total = tracker.get_total_time()
+        >>> print(f"Total: {total:.2f}s")
+        Total: 87.80s
+    """
+```
+
+##### print_summary
+
+```python
+def print_summary(self, console: Optional[Console] = None) -> None:
+    """
+    Print a summary table of all timing records.
+
+    Args:
+        console: Rich console for output (creates new one if not provided).
+
+    Example:
+        >>> tracker.print_summary()
+        # Prints formatted performance table
+    """
+```
+
+##### to_dict
+
+```python
+def to_dict(self) -> Dict:
+    """
+    Export timing data as a dictionary.
+
+    Returns:
+        Dictionary containing all timing records and summaries.
+
+    Example:
+        >>> data = tracker.to_dict()
+        >>> print(data["total_time"])
+        87.8
+    """
+```
+
+### Global Functions
+
+##### get_performance_tracker
+
+```python
+def get_performance_tracker() -> PerformanceTracker:
+    """
+    Get the global performance tracker instance.
+
+    Returns:
+        Global PerformanceTracker instance.
+
+    Example:
+        >>> tracker = get_performance_tracker()
+    """
+```
+
+##### reset_performance_tracker
+
+```python
+def reset_performance_tracker() -> None:
+    """
+    Reset the global performance tracker.
+
+    Example:
+        >>> reset_performance_tracker()
+    """
+```
+
+##### track_performance (context manager)
+
+```python
+@contextmanager
+def track_performance(
+    name: str, stage: str = "default"
+) -> Generator[TimingRecord, None, None]:
+    """
+    Convenience context manager for tracking performance.
+
+    Uses the global performance tracker.
+
+    Args:
+        name: Name of the operation being timed.
+        stage: Stage category for the operation.
+
+    Yields:
+        TimingRecord for the operation.
+
+    Example:
+        >>> from src.performance import track_performance
+        >>> with track_performance("download_iso", "download"):
+        ...     # perform download
+        ...     pass
     """
 ```
 

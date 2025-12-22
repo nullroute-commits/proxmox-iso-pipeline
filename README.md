@@ -161,14 +161,16 @@ proxmox-iso-pipeline/
 │   ├── __init__.py               # Package initialization
 │   ├── builder.py                # Main ISO builder (PEP8/257 compliant)
 │   ├── firmware.py               # Firmware integration module
-│   └── config.py                 # Configuration management
+│   ├── config.py                 # Configuration management
+│   └── performance.py            # Performance timing utilities
 ├── docker/
 │   ├── Dockerfile                # Multi-stage, multi-arch Dockerfile
 │   └── entrypoint.sh             # Container entrypoint script
 ├── scripts/
 │   ├── build-iso.sh              # Main build orchestration script
 │   ├── download-firmware.sh      # Firmware download script
-│   └── inject-firmware.sh        # Firmware injection script
+│   ├── inject-firmware.sh        # Firmware injection script
+│   └── validate-tools.sh         # Tool validation script
 ├── config/
 │   ├── preseed.cfg               # Debian preseed configuration
 │   └── firmware-sources.json     # Firmware package definitions
