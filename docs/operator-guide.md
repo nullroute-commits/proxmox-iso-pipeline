@@ -46,7 +46,7 @@ The included workflow (`.github/workflows/build-iso.yml`) provides:
 Best for: Air-gapped environments, standardized deployments
 
 ```bash
-# Pull pre-built image
+# Pull pre-built image (when using GitHub Container Registry)
 docker pull ghcr.io/nullroute-commits/proxmox-iso-pipeline:main
 
 # Run directly
@@ -56,6 +56,29 @@ docker run --rm --privileged \
   -v $(pwd)/firmware-cache:/workspace/firmware-cache \
   ghcr.io/nullroute-commits/proxmox-iso-pipeline:main build
 ```
+
+### Option 4: Standalone Operation (Without GitHub)
+
+Best for: Air-gapped environments, fully offline operation
+
+The pipeline can operate completely without GitHub access:
+
+```bash
+# Clone or copy the repository to your target system
+cd proxmox-iso-pipeline
+
+# Build Docker image locally (no remote registry access needed)
+docker compose build
+
+# Run the builder
+docker compose run --rm builder build
+```
+
+**Notes for offline operation:**
+- The Docker image is built locally from the Dockerfile
+- No connection to `ghcr.io` or GitHub is required
+- Firmware packages are downloaded from Debian mirrors (requires internet or local mirror)
+- You can pre-populate the `firmware-cache/` directory for fully offline builds
 
 ## CI/CD Integration
 
@@ -257,11 +280,13 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 The builder requires outbound internet access for:
 
-| Domain | Purpose | Port |
-|--------|---------|------|
-| `enterprise.proxmox.com` | ISO download | 443 |
-| `deb.debian.org` | Firmware packages | 80 |
-| `ghcr.io` | Container images | 443 |
+| Domain | Purpose | Port | Required |
+|--------|---------|------|----------|
+| `enterprise.proxmox.com` | ISO download | 443 | Yes |
+| `deb.debian.org` | Firmware packages | 80 | Yes |
+| `ghcr.io` | Pre-built container images (optional) | 443 | No |
+
+**Note:** The pipeline works without `ghcr.io` access when building Docker images locally.
 
 Firewall rules example (iptables):
 
@@ -405,6 +430,17 @@ volumes:
 ```
 
 **Docker Layer Cache:**
+
+For local builds (default, no GitHub required):
+```yaml
+services:
+  builder:
+    build:
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache
+```
+
+For builds with GitHub Container Registry access:
 ```yaml
 services:
   builder:
