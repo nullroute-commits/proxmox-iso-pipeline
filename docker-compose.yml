@@ -9,8 +9,10 @@ services:
       platforms:
         - linux/amd64
         - linux/arm64
+      # Remote cache is optional - only used when ghcr.io is accessible
+      # The pipeline works without GitHub by building locally
       cache_from:
-        - type=registry,ref=ghcr.io/nullroute-commits/proxmox-iso-builder:cache
+        - type=local,src=/tmp/.buildx-cache
     image: proxmox-iso-builder:latest
     container_name: proxmox-iso-builder
     privileged: true  # Required for ISO mounting operations
