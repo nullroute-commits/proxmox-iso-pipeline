@@ -14,6 +14,7 @@ from rich.progress import Progress
 
 from src.config import BuildConfig, ConfigManager
 from src.firmware import FirmwareManager
+from src.performance import get_performance_tracker, track_performance
 
 # Configure logging
 logging.basicConfig(
@@ -61,30 +62,33 @@ class ProxmoxISOBuilder:
         Raises:
             RuntimeError: If download fails
         """
-        if url is None:
-            url = self.PROXMOX_ISO_BASE_URL.format(version=self.config.proxmox_version)
+        with track_performance("download_iso", stage="download"):
+            if url is None:
+                url = self.PROXMOX_ISO_BASE_URL.format(
+                    version=self.config.proxmox_version
+                )
 
-        iso_filename = f"proxmox-ve_{self.config.proxmox_version}.iso"
-        iso_path = self.config.work_dir / iso_filename
+            iso_filename = f"proxmox-ve_{self.config.proxmox_version}.iso"
+            iso_path = self.config.work_dir / iso_filename
 
-        if iso_path.exists():
-            logger.info(f"Using existing ISO: {iso_path}")
-            return iso_path
+            if iso_path.exists():
+                logger.info(f"Using existing ISO: {iso_path}")
+                return iso_path
 
-        logger.info(f"Downloading Proxmox ISO from: {url}")
+            logger.info(f"Downloading Proxmox ISO from: {url}")
 
-        try:
-            # Use wget for downloading with certificate verification disabled
-            # (some enterprise mirrors have certificate issues)
-            subprocess.run(
-                ["wget", "--no-check-certificate", "-O", str(iso_path), url],
-                check=True,
-                capture_output=True,
-            )
-            logger.info(f"Downloaded ISO to: {iso_path}")
-            return iso_path
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to download ISO: {e.stderr}")
+            try:
+                # Use wget for downloading with certificate verification disabled
+                # (some enterprise mirrors have certificate issues)
+                subprocess.run(
+                    ["wget", "--no-check-certificate", "-O", str(iso_path), url],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info(f"Downloaded ISO to: {iso_path}")
+                return iso_path
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f"Failed to download ISO: {e.stderr}")
 
     def extract_iso(self, iso_path: Path) -> Path:
         """
@@ -99,64 +103,65 @@ class ProxmoxISOBuilder:
         Raises:
             RuntimeError: If extraction fails
         """
-        extract_dir = self.config.work_dir / "iso_root"
+        with track_performance("extract_iso", stage="extract"):
+            extract_dir = self.config.work_dir / "iso_root"
 
-        if extract_dir.exists():
-            logger.info(f"Removing existing extraction: {extract_dir}")
-            shutil.rmtree(extract_dir)
+            if extract_dir.exists():
+                logger.info(f"Removing existing extraction: {extract_dir}")
+                shutil.rmtree(extract_dir)
 
-        extract_dir.mkdir(parents=True, exist_ok=True)
+            extract_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Extracting ISO to: {extract_dir}")
-
-        try:
-            # Mount ISO and copy contents
-            mount_point = self.config.work_dir / "iso_mount"
-            mount_point.mkdir(exist_ok=True)
-
-            # Mount the ISO
-            subprocess.run(
-                [
-                    "sudo",
-                    "mount",
-                    "-o",
-                    "loop,ro",
-                    str(iso_path),
-                    str(mount_point),
-                ],
-                check=True,
-                capture_output=True,
-            )
+            logger.info(f"Extracting ISO to: {extract_dir}")
 
             try:
-                # Copy all contents
+                # Mount ISO and copy contents
+                mount_point = self.config.work_dir / "iso_mount"
+                mount_point.mkdir(exist_ok=True)
+
+                # Mount the ISO
                 subprocess.run(
-                    ["sudo", "cp", "-a", f"{mount_point}/.", str(extract_dir)],
+                    [
+                        "sudo",
+                        "mount",
+                        "-o",
+                        "loop,ro",
+                        str(iso_path),
+                        str(mount_point),
+                    ],
                     check=True,
                     capture_output=True,
                 )
-            finally:
-                # Unmount
+
+                try:
+                    # Copy all contents
+                    subprocess.run(
+                        ["sudo", "cp", "-a", f"{mount_point}/.", str(extract_dir)],
+                        check=True,
+                        capture_output=True,
+                    )
+                finally:
+                    # Unmount
+                    subprocess.run(
+                        ["sudo", "umount", str(mount_point)],
+                        check=False,
+                        capture_output=True,
+                    )
+                    mount_point.rmdir()
+
+                # Make files writable
                 subprocess.run(
-                    ["sudo", "umount", str(mount_point)],
-                    check=False,
+                    ["sudo", "chmod", "-R", "u+w", str(extract_dir)],
+                    check=True,
                     capture_output=True,
                 )
-                mount_point.rmdir()
 
-            # Make files writable
-            subprocess.run(
-                ["sudo", "chmod", "-R", "u+w", str(extract_dir)],
-                check=True,
-                capture_output=True,
-            )
+                self.iso_root = extract_dir
+                logger.info(f"ISO extracted successfully to: {extract_dir}")
+                return extract_dir
 
-            self.iso_root = extract_dir
-            logger.info(f"ISO extracted successfully to: {extract_dir}")
-            return extract_dir
-
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to extract ISO: {e.stderr}")
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f"Failed to extract ISO: {e.stderr}")
 
     def download_firmware_packages(self) -> List[Path]:
         """
@@ -165,43 +170,54 @@ class ProxmoxISOBuilder:
         Returns:
             List of downloaded firmware package paths
         """
-        all_packages: List[Path] = []
+        with track_performance("download_firmware_packages", stage="firmware"):
+            all_packages: List[Path] = []
 
-        with Progress() as progress:
-            task = progress.add_task("[cyan]Downloading firmware...", total=4)
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Downloading firmware...", total=4)
 
-            # Always download freeware firmware
-            packages = self.firmware_manager.download_firmware("freeware")
-            all_packages.extend(packages)
-            progress.update(task, advance=1)
-
-            # Download vendor-specific firmware if enabled
-            if self.config.include_nvidia:
-                try:
-                    packages = self.firmware_manager.download_firmware("nvidia")
+                # Always download freeware firmware
+                with track_performance("download_freeware_firmware", stage="firmware"):
+                    packages = self.firmware_manager.download_firmware("freeware")
                     all_packages.extend(packages)
-                except Exception as e:
-                    logger.warning(f"Failed to download NVIDIA firmware: {e}")
-            progress.update(task, advance=1)
+                progress.update(task, advance=1)
 
-            if self.config.include_amd:
-                try:
-                    packages = self.firmware_manager.download_firmware("amd")
-                    all_packages.extend(packages)
-                except Exception as e:
-                    logger.warning(f"Failed to download AMD firmware: {e}")
-            progress.update(task, advance=1)
+                # Download vendor-specific firmware if enabled
+                if self.config.include_nvidia:
+                    try:
+                        with track_performance(
+                            "download_nvidia_firmware", stage="firmware"
+                        ):
+                            packages = self.firmware_manager.download_firmware("nvidia")
+                            all_packages.extend(packages)
+                    except Exception as e:
+                        logger.warning(f"Failed to download NVIDIA firmware: {e}")
+                progress.update(task, advance=1)
 
-            if self.config.include_intel:
-                try:
-                    packages = self.firmware_manager.download_firmware("intel")
-                    all_packages.extend(packages)
-                except Exception as e:
-                    logger.warning(f"Failed to download Intel firmware: {e}")
-            progress.update(task, advance=1)
+                if self.config.include_amd:
+                    try:
+                        with track_performance(
+                            "download_amd_firmware", stage="firmware"
+                        ):
+                            packages = self.firmware_manager.download_firmware("amd")
+                            all_packages.extend(packages)
+                    except Exception as e:
+                        logger.warning(f"Failed to download AMD firmware: {e}")
+                progress.update(task, advance=1)
 
-        logger.info(f"Downloaded {len(all_packages)} firmware packages")
-        return all_packages
+                if self.config.include_intel:
+                    try:
+                        with track_performance(
+                            "download_intel_firmware", stage="firmware"
+                        ):
+                            packages = self.firmware_manager.download_firmware("intel")
+                            all_packages.extend(packages)
+                    except Exception as e:
+                        logger.warning(f"Failed to download Intel firmware: {e}")
+                progress.update(task, advance=1)
+
+            logger.info(f"Downloaded {len(all_packages)} firmware packages")
+            return all_packages
 
     def integrate_firmware(self, firmware_packages: List[Path]) -> None:
         """
@@ -213,12 +229,13 @@ class ProxmoxISOBuilder:
         Raises:
             RuntimeError: If ISO root is not set
         """
-        if self.iso_root is None:
-            raise RuntimeError("ISO not extracted yet")
+        with track_performance("integrate_firmware", stage="integration"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
 
-        logger.info("Integrating firmware into ISO...")
-        self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
-        logger.info("Firmware integration complete")
+            logger.info("Integrating firmware into ISO...")
+            self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
+            logger.info("Firmware integration complete")
 
     def validate_boot_files(self) -> bool:
         """
@@ -230,37 +247,40 @@ class ProxmoxISOBuilder:
         Raises:
             RuntimeError: If ISO root is not set or boot files are missing
         """
-        if self.iso_root is None:
-            raise RuntimeError("ISO not extracted yet")
+        with track_performance("validate_boot_files", stage="validation"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
 
-        logger.info("Validating boot files...")
+            logger.info("Validating boot files...")
 
-        # Check for EFI boot files
-        efi_img = self.iso_root / "efi.img"
-        if not efi_img.exists():
-            raise RuntimeError(
-                f"EFI boot image not found: {efi_img}\n"
-                "The ISO may not be compatible with UEFI/Secure Boot"
-            )
+            # Check for EFI boot files
+            efi_img = self.iso_root / "efi.img"
+            if not efi_img.exists():
+                raise RuntimeError(
+                    f"EFI boot image not found: {efi_img}\n"
+                    "The ISO may not be compatible with UEFI/Secure Boot"
+                )
 
-        # Check for BIOS boot files (isolinux)
-        isolinux_bin = self.iso_root / "isolinux" / "isolinux.bin"
-        if isolinux_bin.exists():
-            logger.info("BIOS boot support: isolinux.bin found")
-        else:
-            logger.info("BIOS boot files not found - ISO will only support UEFI mode")
+            # Check for BIOS boot files (isolinux)
+            isolinux_bin = self.iso_root / "isolinux" / "isolinux.bin"
+            if isolinux_bin.exists():
+                logger.info("BIOS boot support: isolinux.bin found")
+            else:
+                logger.info(
+                    "BIOS boot files not found - ISO will only support UEFI mode"
+                )
 
-        # Check for GRUB configuration
-        grub_cfg_paths = [
-            self.iso_root / "boot" / "grub" / "grub.cfg",
-            self.iso_root / "boot" / "grub" / "loopback.cfg",
-        ]
-        grub_found = any(p.exists() for p in grub_cfg_paths)
-        if not grub_found:
-            logger.warning("GRUB configuration not found")
+            # Check for GRUB configuration
+            grub_cfg_paths = [
+                self.iso_root / "boot" / "grub" / "grub.cfg",
+                self.iso_root / "boot" / "grub" / "loopback.cfg",
+            ]
+            grub_found = any(p.exists() for p in grub_cfg_paths)
+            if not grub_found:
+                logger.warning("GRUB configuration not found")
 
-        logger.info("Boot file validation complete")
-        return True
+            logger.info("Boot file validation complete")
+            return True
 
     def _find_mbr_template(self) -> Optional[Path]:
         """
@@ -305,97 +325,98 @@ class ProxmoxISOBuilder:
         Raises:
             RuntimeError: If ISO root is not set or rebuild fails
         """
-        if self.iso_root is None:
-            raise RuntimeError("ISO not extracted yet")
+        with track_performance("rebuild_iso", stage="rebuild"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
 
-        if output_name is None:
-            output_name = f"proxmox-ve_{self.config.proxmox_version}_custom.iso"
+            if output_name is None:
+                output_name = f"proxmox-ve_{self.config.proxmox_version}_custom.iso"
 
-        output_path = self.config.output_dir / output_name
+            output_path = self.config.output_dir / output_name
 
-        logger.info(f"Rebuilding ISO: {output_path}")
+            logger.info(f"Rebuilding ISO: {output_path}")
 
-        # Validate boot files exist
-        self.validate_boot_files()
+            # Validate boot files exist
+            self.validate_boot_files()
 
-        # Check which boot modes are available
-        has_isolinux = (self.iso_root / "isolinux" / "isolinux.bin").exists()
-        has_efi = (self.iso_root / "efi.img").exists()
+            # Check which boot modes are available
+            has_isolinux = (self.iso_root / "isolinux" / "isolinux.bin").exists()
+            has_efi = (self.iso_root / "efi.img").exists()
 
-        # Build xorriso command with hybrid boot support
-        xorriso_cmd = [
-            "xorriso",
-            "-as",
-            "mkisofs",
-            "-r",  # Rock Ridge extensions for POSIX compatibility
-            "-V",
-            f"PVE{self.config.proxmox_version.replace('.', '')}",
-            "-J",  # Joliet extensions for Windows compatibility
-            "-joliet-long",  # Allow longer Joliet filenames
-        ]
+            # Build xorriso command with hybrid boot support
+            xorriso_cmd = [
+                "xorriso",
+                "-as",
+                "mkisofs",
+                "-r",  # Rock Ridge extensions for POSIX compatibility
+                "-V",
+                f"PVE{self.config.proxmox_version.replace('.', '')}",
+                "-J",  # Joliet extensions for Windows compatibility
+                "-joliet-long",  # Allow longer Joliet filenames
+            ]
 
-        # Add BIOS boot support if isolinux is available
-        if has_isolinux:
-            logger.info("Adding BIOS boot support (isolinux)")
-            xorriso_cmd.extend(
-                [
-                    "-b",
-                    "isolinux/isolinux.bin",  # BIOS boot image
-                    "-c",
-                    "isolinux/boot.cat",  # Boot catalog
-                    "-no-emul-boot",  # No emulation mode
-                    "-boot-load-size",
-                    "4",  # Load 4 sectors
-                    "-boot-info-table",  # Add boot info table
-                ]
-            )
+            # Add BIOS boot support if isolinux is available
+            if has_isolinux:
+                logger.info("Adding BIOS boot support (isolinux)")
+                xorriso_cmd.extend(
+                    [
+                        "-b",
+                        "isolinux/isolinux.bin",  # BIOS boot image
+                        "-c",
+                        "isolinux/boot.cat",  # Boot catalog
+                        "-no-emul-boot",  # No emulation mode
+                        "-boot-load-size",
+                        "4",  # Load 4 sectors
+                        "-boot-info-table",  # Add boot info table
+                    ]
+                )
 
-            # Add MBR template for hybrid boot if available
-            mbr_template = self._find_mbr_template()
-            if mbr_template:
-                xorriso_cmd.extend(["-isohybrid-mbr", str(mbr_template)])
+                # Add MBR template for hybrid boot if available
+                mbr_template = self._find_mbr_template()
+                if mbr_template:
+                    xorriso_cmd.extend(["-isohybrid-mbr", str(mbr_template)])
 
-        # Add UEFI boot support
-        if has_efi:
-            logger.info("Adding UEFI boot support (Secure Boot compatible)")
-            xorriso_cmd.extend(
-                [
-                    "-eltorito-alt-boot",  # Alternate boot entry
-                    "-e",
-                    "efi.img",  # EFI boot image
-                    "-no-emul-boot",  # No emulation mode
-                    "-append_partition",
-                    "2",  # Partition number
-                    "0xef",  # EFI System Partition type
-                    str(self.iso_root / "efi.img"),
-                    "-isohybrid-gpt-basdat",  # GPT partition for hybrid ISO
-                ]
-            )
+            # Add UEFI boot support
+            if has_efi:
+                logger.info("Adding UEFI boot support (Secure Boot compatible)")
+                xorriso_cmd.extend(
+                    [
+                        "-eltorito-alt-boot",  # Alternate boot entry
+                        "-e",
+                        "efi.img",  # EFI boot image
+                        "-no-emul-boot",  # No emulation mode
+                        "-append_partition",
+                        "2",  # Partition number
+                        "0xef",  # EFI System Partition type
+                        str(self.iso_root / "efi.img"),
+                        "-isohybrid-gpt-basdat",  # GPT partition for hybrid ISO
+                    ]
+                )
 
-        # Add output path and source directory
-        xorriso_cmd.extend(["-o", str(output_path), str(self.iso_root)])
+            # Add output path and source directory
+            xorriso_cmd.extend(["-o", str(output_path), str(self.iso_root)])
 
-        try:
-            logger.debug(f"Running xorriso command: {' '.join(xorriso_cmd)}")
-            result = subprocess.run(
-                xorriso_cmd, check=True, capture_output=True, text=True
-            )
+            try:
+                logger.debug(f"Running xorriso command: {' '.join(xorriso_cmd)}")
+                result = subprocess.run(
+                    xorriso_cmd, check=True, capture_output=True, text=True
+                )
 
-            # Log xorriso output for debugging
-            if result.stdout:
-                logger.debug(f"xorriso output: {result.stdout}")
+                # Log xorriso output for debugging
+                if result.stdout:
+                    logger.debug(f"xorriso output: {result.stdout}")
 
-            logger.info(f"ISO created successfully: {output_path}")
-            logger.info(
-                f"Boot modes: BIOS={'yes' if has_isolinux else 'no'}, "
-                f"UEFI={'yes' if has_efi else 'no'}"
-            )
-            return output_path
+                logger.info(f"ISO created successfully: {output_path}")
+                logger.info(
+                    f"Boot modes: BIOS={'yes' if has_isolinux else 'no'}, "
+                    f"UEFI={'yes' if has_efi else 'no'}"
+                )
+                return output_path
 
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to rebuild ISO: {e.stderr if e.stderr else str(e)}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Failed to rebuild ISO: {e.stderr if e.stderr else str(e)}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
     def build(self, iso_url: Optional[str] = None) -> Path:
         """
@@ -407,29 +428,39 @@ class ProxmoxISOBuilder:
         Returns:
             Path to created custom ISO
         """
-        console.print("[bold green]Starting Proxmox ISO build process...[/bold green]")
+        tracker = get_performance_tracker()
 
-        # Download original ISO
-        console.print("[cyan]Step 1/5: Downloading Proxmox ISO[/cyan]")
-        iso_path = self.download_iso(iso_url)
+        with track_performance("complete_build", stage="build"):
+            console.print(
+                "[bold green]Starting Proxmox ISO build process...[/bold green]"
+            )
 
-        # Extract ISO
-        console.print("[cyan]Step 2/5: Extracting ISO[/cyan]")
-        self.extract_iso(iso_path)
+            # Download original ISO
+            console.print("[cyan]Step 1/5: Downloading Proxmox ISO[/cyan]")
+            iso_path = self.download_iso(iso_url)
 
-        # Download firmware
-        console.print("[cyan]Step 3/5: Downloading firmware packages[/cyan]")
-        firmware_packages = self.download_firmware_packages()
+            # Extract ISO
+            console.print("[cyan]Step 2/5: Extracting ISO[/cyan]")
+            self.extract_iso(iso_path)
 
-        # Integrate firmware
-        console.print("[cyan]Step 4/5: Integrating firmware[/cyan]")
-        self.integrate_firmware(firmware_packages)
+            # Download firmware
+            console.print("[cyan]Step 3/5: Downloading firmware packages[/cyan]")
+            firmware_packages = self.download_firmware_packages()
 
-        # Rebuild ISO
-        console.print("[cyan]Step 5/5: Rebuilding ISO[/cyan]")
-        output_iso = self.rebuild_iso()
+            # Integrate firmware
+            console.print("[cyan]Step 4/5: Integrating firmware[/cyan]")
+            self.integrate_firmware(firmware_packages)
 
-        console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
+            # Rebuild ISO
+            console.print("[cyan]Step 5/5: Rebuilding ISO[/cyan]")
+            output_iso = self.rebuild_iso()
+
+            console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
+
+        # Print performance summary
+        console.print("\n")
+        tracker.print_summary(console)
+
         return output_iso
 
 

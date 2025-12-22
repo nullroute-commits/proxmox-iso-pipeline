@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.performance import track_performance
+
 logger = logging.getLogger(__name__)
 
 
@@ -152,31 +154,36 @@ class FirmwareManager:
         Raises:
             FirmwareDownloadError: If download fails
         """
-        # Configure apt sources before downloading
-        self._configure_apt_sources()
+        with track_performance(
+            f"download_{vendor}_packages", stage="firmware_download"
+        ):
+            # Configure apt sources before downloading
+            self._configure_apt_sources()
 
-        if vendor not in self.firmware_sources:
-            raise FirmwareDownloadError(f"Unknown firmware vendor: {vendor}")
+            if vendor not in self.firmware_sources:
+                raise FirmwareDownloadError(f"Unknown firmware vendor: {vendor}")
 
-        packages = self.firmware_sources[vendor]
-        downloaded_files: List[Path] = []
+            packages = self.firmware_sources[vendor]
+            downloaded_files: List[Path] = []
 
-        logger.info(f"Downloading {vendor} firmware packages: {packages}")
+            logger.info(f"Downloading {vendor} firmware packages: {packages}")
 
-        for package_name in packages:
-            try:
-                file_path = self._download_package(package_name, force)
-                if file_path:
-                    downloaded_files.append(file_path)
-                    logger.info(f"Downloaded: {file_path}")
-            except Exception as e:
-                logger.warning(f"Failed to download {package_name}: {e}")
-                # Continue with other packages
+            for package_name in packages:
+                try:
+                    file_path = self._download_package(package_name, force)
+                    if file_path:
+                        downloaded_files.append(file_path)
+                        logger.info(f"Downloaded: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to download {package_name}: {e}")
+                    # Continue with other packages
 
-        if not downloaded_files:
-            raise FirmwareDownloadError(f"No firmware packages downloaded for {vendor}")
+            if not downloaded_files:
+                raise FirmwareDownloadError(
+                    f"No firmware packages downloaded for {vendor}"
+                )
 
-        return downloaded_files
+            return downloaded_files
 
     def _download_package(
         self, package_name: str, force: bool = False
@@ -240,20 +247,23 @@ class FirmwareManager:
         Raises:
             FirmwareIntegrationError: If extraction fails
         """
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        with track_performance(
+            f"extract_{package_path.stem}", stage="firmware_extract"
+        ):
+            dest_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            # Extract .deb package using dpkg-deb
-            subprocess.run(
-                ["dpkg-deb", "-x", str(package_path), str(dest_dir)],
-                check=True,
-                capture_output=True,
-            )
-            logger.info(f"Extracted {package_path} to {dest_dir}")
-        except subprocess.CalledProcessError as e:
-            raise FirmwareIntegrationError(
-                f"Failed to extract {package_path}: {e.stderr}"
-            )
+            try:
+                # Extract .deb package using dpkg-deb
+                subprocess.run(
+                    ["dpkg-deb", "-x", str(package_path), str(dest_dir)],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info(f"Extracted {package_path} to {dest_dir}")
+            except subprocess.CalledProcessError as e:
+                raise FirmwareIntegrationError(
+                    f"Failed to extract {package_path}: {e.stderr}"
+                )
 
     def verify_checksum(
         self, file_path: Path, expected_hash: str, hash_type: str = "sha256"
@@ -294,33 +304,39 @@ class FirmwareManager:
         Raises:
             FirmwareIntegrationError: If integration fails
         """
-        firmware_dir = iso_root / "firmware"
-        firmware_dir.mkdir(parents=True, exist_ok=True)
+        with track_performance("integrate_all_firmware", stage="firmware_integration"):
+            firmware_dir = iso_root / "firmware"
+            firmware_dir.mkdir(parents=True, exist_ok=True)
 
-        for package_path in firmware_files:
-            try:
-                # Extract to temporary directory
-                temp_extract = self.cache_dir / "temp_extract"
-                temp_extract.mkdir(exist_ok=True)
+            for package_path in firmware_files:
+                try:
+                    with track_performance(
+                        f"integrate_{package_path.stem}", stage="firmware_integration"
+                    ):
+                        # Extract to temporary directory
+                        temp_extract = self.cache_dir / "temp_extract"
+                        temp_extract.mkdir(exist_ok=True)
 
-                self.extract_firmware(package_path, temp_extract)
+                        self.extract_firmware(package_path, temp_extract)
 
-                # Copy firmware files to ISO
-                lib_firmware = temp_extract / "lib" / "firmware"
-                if lib_firmware.exists():
-                    for item in lib_firmware.rglob("*"):
-                        if item.is_file():
-                            rel_path = item.relative_to(lib_firmware)
-                            dest = firmware_dir / rel_path
-                            dest.parent.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(item, dest)
-                            logger.debug(f"Copied firmware: {rel_path}")
+                        # Copy firmware files to ISO
+                        lib_firmware = temp_extract / "lib" / "firmware"
+                        if lib_firmware.exists():
+                            for item in lib_firmware.rglob("*"):
+                                if item.is_file():
+                                    rel_path = item.relative_to(lib_firmware)
+                                    dest = firmware_dir / rel_path
+                                    dest.parent.mkdir(parents=True, exist_ok=True)
+                                    shutil.copy2(item, dest)
+                                    logger.debug(f"Copied firmware: {rel_path}")
 
-                # Clean up
-                shutil.rmtree(temp_extract, ignore_errors=True)
+                        # Clean up
+                        shutil.rmtree(temp_extract, ignore_errors=True)
 
-            except Exception as e:
-                logger.error(f"Failed to integrate {package_path}: {e}")
-                raise FirmwareIntegrationError(f"Firmware integration failed: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to integrate {package_path}: {e}")
+                    raise FirmwareIntegrationError(f"Firmware integration failed: {e}")
 
-        logger.info(f"Successfully integrated {len(firmware_files)} firmware packages")
+            logger.info(
+                f"Successfully integrated {len(firmware_files)} firmware packages"
+            )
