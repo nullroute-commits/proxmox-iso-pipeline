@@ -81,6 +81,14 @@ The Proxmox ISO Pipeline is a containerized build system that creates custom Pro
 │                    │  ProxmoxISOBuilder  │                          │
 │                    │    (Main Class)     │                          │
 │                    └─────────────────────┘                          │
+│                                 │                                    │
+│                                 ▼                                    │
+│                    ┌─────────────────────┐                          │
+│                    │ src/performance.py  │                          │
+│                    │ • Timing Tracking   │                          │
+│                    │ • Stage Summaries   │                          │
+│                    │ • Performance Logs  │                          │
+│                    └─────────────────────┘                          │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -92,6 +100,7 @@ The Proxmox ISO Pipeline is a containerized build system that creates custom Pro
 | `builder.py` | ISO build orchestration | `ProxmoxISOBuilder` |
 | `firmware.py` | Firmware management | `FirmwareManager` |
 | `config.py` | Configuration management | `BuildConfig`, `ConfigManager` |
+| `performance.py` | Performance tracking | `PerformanceTracker`, `TimingRecord` |
 
 ## Data Flow
 
@@ -175,7 +184,8 @@ proxmox-iso-pipeline/
 │   ├── __init__.py
 │   ├── builder.py                # Main builder logic
 │   ├── config.py                 # Configuration handling
-│   └── firmware.py               # Firmware management
+│   ├── firmware.py               # Firmware management
+│   └── performance.py            # Performance timing utilities
 ├── config/                       # Configuration files
 │   ├── firmware-sources.json     # Firmware package definitions
 │   └── preseed.cfg               # Debian preseed (future)
@@ -185,7 +195,8 @@ proxmox-iso-pipeline/
 ├── scripts/                      # Shell scripts
 │   ├── build-iso.sh              # Main build script
 │   ├── download-firmware.sh      # Firmware download
-│   └── inject-firmware.sh        # Firmware injection
+│   ├── inject-firmware.sh        # Firmware injection
+│   └── validate-tools.sh         # Tool validation script
 ├── work/                         # Working directory (gitignored)
 │   ├── iso_root/                 # Extracted ISO contents
 │   └── iso_mount/                # Temporary mount point
@@ -277,6 +288,47 @@ proxmox-iso-pipeline/
 │   + validate() -> bool                                           │
 │   - _update_config(data) -> None                                 │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+### performance.py - Performance Tracking Classes
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      TimingRecord                                │
+├─────────────────────────────────────────────────────────────────┤
+│ @dataclass                                                       │
+│   - name: str                                                    │
+│   - stage: str                                                   │
+│   - start_time: float                                            │
+│   - end_time: Optional[float]                                    │
+│   - duration: Optional[float]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ Methods:                                                         │
+│   + complete() -> None                                           │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    PerformanceTracker                            │
+├─────────────────────────────────────────────────────────────────┤
+│ Attributes:                                                      │
+│   - records: List[TimingRecord]                                  │
+│   - _active_timers: Dict[str, TimingRecord]                      │
+├─────────────────────────────────────────────────────────────────┤
+│ Methods:                                                         │
+│   + start_timer(name, stage?) -> TimingRecord                    │
+│   + stop_timer(name, stage?) -> Optional[TimingRecord]           │
+│   + track(name, stage?) -> ContextManager[TimingRecord]          │
+│   + get_stage_summary() -> Dict[str, float]                      │
+│   + get_total_time() -> float                                    │
+│   + format_duration(seconds) -> str                              │
+│   + print_summary(console?) -> None                              │
+│   + to_dict() -> Dict                                            │
+└─────────────────────────────────────────────────────────────────┘
+
+Global Functions:
+  + get_performance_tracker() -> PerformanceTracker
+  + reset_performance_tracker() -> None
+  + track_performance(name, stage?) -> ContextManager[TimingRecord]
 ```
 
 ## Docker Architecture

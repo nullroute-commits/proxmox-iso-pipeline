@@ -117,25 +117,27 @@ class FirmwareManager:
             with sources_file.open() as f:
                 return json.load(f)
 
-        # Default firmware sources
+        # Default firmware sources (matches config/firmware-sources.json)
         return {
             "freeware": [
                 "firmware-linux-free",
                 "firmware-misc-nonfree",
+                "firmware-linux-nonfree",
             ],
             "nvidia": [
                 "nvidia-driver",
-                "nvidia-firmware-graphics",
+                "nvidia-kernel-dkms",
                 "firmware-nvidia-graphics",
             ],
             "amd": [
-                "amdgpu-firmware",
                 "firmware-amd-graphics",
                 "amd64-microcode",
+                "firmware-amd-microcode",
             ],
             "intel": [
                 "intel-microcode",
                 "firmware-intel-sound",
+                "firmware-intelwimax",
                 "i915-firmware",
             ],
         }
