@@ -772,6 +772,32 @@ def get_total_time(self) -> float:
     """
 ```
 
+##### format_duration
+
+```python
+def format_duration(self, seconds: float) -> str:
+    """
+    Format duration in human-readable format.
+
+    Converts seconds into a human-readable string with appropriate
+    units (seconds, minutes, hours).
+
+    Args:
+        seconds: Duration in seconds.
+
+    Returns:
+        Formatted duration string.
+
+    Example:
+        >>> tracker.format_duration(45.5)
+        '45.50s'
+        >>> tracker.format_duration(125.3)
+        '2m 5.30s'
+        >>> tracker.format_duration(3725.5)
+        '1h 2m 5.50s'
+    """
+```
+
 ##### print_summary
 
 ```python
