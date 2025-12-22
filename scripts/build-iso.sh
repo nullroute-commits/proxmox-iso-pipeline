@@ -8,7 +8,52 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Timing variables
+declare -A TIMING_START
+declare -A TIMING_END
+declare -a TIMING_ORDER
+
+# Function to start timing
+start_timer() {
+    local name="$1"
+    TIMING_START["$name"]=$(date +%s.%N)
+    TIMING_ORDER+=("$name")
+}
+
+# Function to stop timing
+stop_timer() {
+    local name="$1"
+    TIMING_END["$name"]=$(date +%s.%N)
+    local start="${TIMING_START[$name]}"
+    local end="${TIMING_END[$name]}"
+    local duration=$(echo "$end - $start" | bc)
+    echo -e "${CYAN}[PERF]${NC} $name: ${duration}s"
+}
+
+# Function to print performance summary
+print_timing_summary() {
+    echo -e "\n${BLUE}========================================${NC}"
+    echo -e "${BLUE}       Performance Summary${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    
+    local total=0
+    for name in "${TIMING_ORDER[@]}"; do
+        local start="${TIMING_START[$name]}"
+        local end="${TIMING_END[$name]}"
+        if [ -n "$start" ] && [ -n "$end" ]; then
+            local duration=$(echo "$end - $start" | bc)
+            total=$(echo "$total + $duration" | bc)
+            printf "${CYAN}%-30s${NC} %10.2fs\n" "$name:" "$duration"
+        fi
+    done
+    
+    echo -e "${BLUE}----------------------------------------${NC}"
+    printf "${GREEN}%-30s${NC} %10.2fs\n" "Total:" "$total"
+    echo -e "${BLUE}========================================${NC}\n"
+}
 
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -57,20 +102,25 @@ fi
 
 # Function to build Docker image
 build_image() {
+    start_timer "build_docker_image"
     print_info "Building Docker image..."
     docker compose build builder
+    stop_timer "build_docker_image"
     print_success "Docker image built successfully"
 }
 
 # Function to run linter
 run_linter() {
+    start_timer "run_linter"
     print_info "Running code quality checks..."
     docker compose run --rm linter
+    stop_timer "run_linter"
     print_success "Code quality checks passed"
 }
 
 # Function to build ISO
 build_iso() {
+    start_timer "build_iso"
     print_info "Starting ISO build process..."
     
     # Prepare build arguments
@@ -90,11 +140,14 @@ build_iso() {
     
     # Run builder
     docker compose run --rm builder build $BUILD_ARGS
+    stop_timer "build_iso"
     print_success "ISO build completed"
 }
 
 # Main execution
 main() {
+    start_timer "total_execution"
+    
     case "${1:-all}" in
         build-image)
             build_image
@@ -116,6 +169,9 @@ main() {
             exit 1
             ;;
     esac
+    
+    stop_timer "total_execution"
+    print_timing_summary
 }
 
 main "$@"
