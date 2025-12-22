@@ -60,7 +60,7 @@ check_command() {
             docker)
                 version=$(docker --version 2>/dev/null | head -1)
                 ;;
-            python|python3|python3.13)
+            python|python3|python3.*)
                 version=$($cmd --version 2>/dev/null | head -1)
                 ;;
             wget|curl)
@@ -164,10 +164,17 @@ check_disk_space() {
     local min_space_gb="${1:-20}"
     local dir="${2:-.}"
     
-    # Get available space in GB
-    local available_gb=$(df -BG "$dir" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G')
+    # Get available space in GB using --output for more reliable parsing
+    # Falls back to traditional method if --output is not supported
+    local available_gb
+    if available_gb=$(df --output=avail -BG "$dir" 2>/dev/null | tail -1 | tr -d ' G'); then
+        :  # Success with --output option
+    else
+        # Fallback for systems without --output support
+        available_gb=$(df -BG "$dir" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G')
+    fi
     
-    if [ -n "$available_gb" ]; then
+    if [ -n "$available_gb" ] && [ "$available_gb" -eq "$available_gb" ] 2>/dev/null; then
         if [ "$available_gb" -ge "$min_space_gb" ]; then
             print_pass "Disk space: ${available_gb}GB available (minimum: ${min_space_gb}GB)"
         else
@@ -182,8 +189,9 @@ check_disk_space() {
 check_network() {
     print_section "Network Connectivity"
     
-    # Check general internet connectivity
-    if curl -s --connect-timeout 5 https://www.google.com > /dev/null 2>&1; then
+    # Check general internet connectivity using DNS (more reliable in corporate environments)
+    if curl -s --connect-timeout 5 http://deb.debian.org/debian/ > /dev/null 2>&1 || \
+       ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; then
         print_pass "Internet connectivity available"
     else
         print_warn "Internet connectivity may be limited"
@@ -240,12 +248,24 @@ main() {
     check_command "genisoimage" "ISO generation" "false"
     check_command "isolinux" "BIOS bootloader" "false"
     check_command "dpkg-deb" "Debian package tool" "false"
-    check_command "squashfs-tools" "Squashfs tools" "false"
+    check_command "mksquashfs" "Squashfs creation tool" "false"
     
     # Section 4: Python Environment
     print_section "Python Environment"
     check_command "python3" "Python 3" "false"
-    check_command "python3.13" "Python 3.13" "false"
+    # Check for Python 3.11+ (required for this project)
+    if command -v python3 &> /dev/null; then
+        local py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
+        if [ -n "$py_version" ]; then
+            local py_major=$(echo "$py_version" | cut -d. -f1)
+            local py_minor=$(echo "$py_version" | cut -d. -f2)
+            if [ "$py_major" -ge 3 ] && [ "$py_minor" -ge 11 ]; then
+                print_pass "Python version $py_version meets minimum requirement (3.11+)"
+            else
+                print_warn "Python version $py_version is below recommended 3.11+"
+            fi
+        fi
+    fi
     check_command "pip3" "Pip package manager" "false"
     
     # Section 5: Project Scripts
