@@ -84,18 +84,18 @@ class FirmwareManager:
         )
 
         try:
-            # Write sources file
+            # Write sources file (use sudo for permission)
             subprocess.run(
-                ["tee", str(sources_file)],
+                ["sudo", "tee", str(sources_file)],
                 input=sources_content.encode(),
                 check=True,
                 capture_output=True,
             )
 
-            # Update apt cache
+            # Update apt cache (use sudo for permission)
             logger.info("Updating apt cache...")
             subprocess.run(
-                ["apt-get", "update"],
+                ["sudo", "apt-get", "update"],
                 check=True,
                 capture_output=True,
             )
@@ -308,7 +308,12 @@ class FirmwareManager:
         """
         with track_performance("integrate_all_firmware", stage="firmware_integration"):
             firmware_dir = iso_root / "firmware"
-            firmware_dir.mkdir(parents=True, exist_ok=True)
+            # Use sudo to create firmware directory (ISO root may be owned by root)
+            subprocess.run(
+                ["sudo", "mkdir", "-p", str(firmware_dir)],
+                check=True,
+                capture_output=True,
+            )
 
             for package_path in firmware_files:
                 try:
@@ -328,8 +333,22 @@ class FirmwareManager:
                                 if item.is_file():
                                     rel_path = item.relative_to(lib_firmware)
                                     dest = firmware_dir / rel_path
-                                    dest.parent.mkdir(parents=True, exist_ok=True)
-                                    shutil.copy2(item, dest)
+                                    # Use sudo to create parent directory and copy
+                                    subprocess.run(
+                                        [
+                                            "sudo",
+                                            "mkdir",
+                                            "-p",
+                                            str(dest.parent),
+                                        ],
+                                        check=True,
+                                        capture_output=True,
+                                    )
+                                    subprocess.run(
+                                        ["sudo", "cp", "-p", str(item), str(dest)],
+                                        check=True,
+                                        capture_output=True,
+                                    )
                                     logger.debug(f"Copied firmware: {rel_path}")
 
                         # Clean up
