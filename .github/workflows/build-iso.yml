@@ -212,16 +212,16 @@ jobs:
 
       - name: Build ISO using Docker container
         run: |
-          docker run --rm --privileged \
+          docker run --rm --cap-add SYS_ADMIN --device /dev/loop-control \
             -v ${{ github.workspace }}/output:/workspace/output \
             -v ${{ github.workspace }}/work:/workspace/work \
             -v ${{ github.workspace }}/firmware-cache:/workspace/firmware-cache \
             ghcr.io/${{ github.repository }}:main build \
             --proxmox-version ${{ env.PROXMOX_VERSION }} \
             --debian-release ${{ env.DEBIAN_RELEASE }} \
-            ${{ env.INCLUDE_NVIDIA != 'true' && '--no-nvidia' || '' }} \
-            ${{ env.INCLUDE_AMD != 'true' && '--no-amd' || '' }} \
-            ${{ env.INCLUDE_INTEL != 'true' && '--no-intel' || '' }}
+            ${{ env.INCLUDE_NVIDIA == 'true' && '' || '--no-nvidia' }} \
+            ${{ env.INCLUDE_AMD == 'true' && '' || '--no-amd' }} \
+            ${{ env.INCLUDE_INTEL == 'true' && '' || '--no-intel' }}
 
       - name: List generated artifacts
         run: |
@@ -259,14 +259,14 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          VERSION="v${{ env.PROXMOX_VERSION }}-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)"
+          VERSION="v${{ env.PROXMOX_VERSION }}-$(date -u +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated version: $VERSION"
 
       - name: Generate release notes
         id: release_notes
         run: |
-          cat << EOF > release_notes.md
+          cat << 'EOF' > release_notes.md
           ## Proxmox VE ${{ env.PROXMOX_VERSION }} Custom ISO
 
           ### Features
@@ -284,12 +284,15 @@ jobs:
           - ✅ GPT and MBR partition tables
 
           ### Installation
-          \`\`\`bash
+          ```bash
+          # WARNING: Replace /dev/sdX with your actual USB device.
+          # Double-check with 'lsblk' to avoid data loss.
+
           # Linux/macOS - Write to USB
-          sudo dd if=proxmox-ve_${{ env.PROXMOX_VERSION }}_custom.iso of=/dev/sdX bs=4M status=progress
+          sudo dd if=proxmox-ve-custom.iso of=/dev/sdX bs=4M status=progress
 
           # Or use Rufus/Etcher on Windows
-          \`\`\`
+          ```
 
           ### Recent Commits
           EOF
