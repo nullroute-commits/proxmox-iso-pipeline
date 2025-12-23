@@ -306,18 +306,33 @@ class ProxmoxISOBuilder:
 
         initrd_orig = initrd.with_suffix(".img.orig")
         # Backup original initrd using sudo (may be root-owned)
-        subprocess.run(
-            ["sudo", "mv", str(initrd), str(initrd_orig)],
-            check=True,
-            capture_output=True,
-        )
-        # Combine: early_ucode + original_initrd
         cat_cmd = f"cat {early_cpio} {initrd_orig} > {initrd}"
-        subprocess.run(
-            ["sudo", "sh", "-c", cat_cmd],
-            check=True,
-            capture_output=True,
-        )
+        try:
+            subprocess.run(
+                ["sudo", "mv", str(initrd), str(initrd_orig)],
+                check=True,
+                capture_output=True,
+            )
+            # Combine: early_ucode + original_initrd
+            subprocess.run(
+                ["sudo", "sh", "-c", cat_cmd],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            # Attempt to restore the original initrd from the backup
+            try:
+                subprocess.run(
+                    ["sudo", "mv", str(initrd_orig), str(initrd)],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.SubprocessError:
+                logger.error(
+                    "Failed to restore original initrd from backup '%s'",
+                    initrd_orig,
+                )
+            raise
         logger.info(
             f"Combined initrd: {initrd.stat().st_size} bytes "
             f"(was {initrd_orig.stat().st_size} bytes)"
