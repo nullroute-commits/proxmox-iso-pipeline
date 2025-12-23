@@ -237,6 +237,107 @@ class ProxmoxISOBuilder:
             self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
             logger.info("Firmware integration complete")
 
+    def _combine_microcode_files(
+        self, ucode_dir: Path, src_dir: Path, vendor: str
+    ) -> bool:
+        """
+        Combine microcode files from a source directory into a single blob.
+
+        Args:
+            ucode_dir: Directory to write combined microcode
+            src_dir: Source directory containing microcode files
+            vendor: Vendor name ('GenuineIntel' or 'AuthenticAMD')
+
+        Returns:
+            True if microcode was added, False otherwise
+        """
+        if not src_dir.exists():
+            return False
+
+        files = list(src_dir.glob("*"))
+        if not files:
+            return False
+
+        blob_path = ucode_dir / f"{vendor}.bin"
+        with blob_path.open("wb") as out:
+            for f in sorted(files):
+                # Skip non-files and Intel's .initramfs files
+                if f.is_file() and not f.name.endswith(".initramfs"):
+                    out.write(f.read_bytes())
+
+        if blob_path.stat().st_size > 0:
+            logger.info(f"{vendor} microcode: {blob_path.stat().st_size} bytes")
+            return True
+        return False
+
+    def _create_early_cpio(self, temp_path: Path, cpio_path: Path) -> None:
+        """
+        Create early microcode cpio archive.
+
+        Args:
+            temp_path: Directory containing microcode structure
+            cpio_path: Path to write the cpio archive
+        """
+        result = subprocess.run(
+            ["find", ".", "-print0"],
+            cwd=temp_path,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["cpio", "-o", "-H", "newc", "-0"],
+            input=result.stdout,
+            cwd=temp_path,
+            stdout=cpio_path.open("wb"),
+            check=True,
+        )
+        logger.info(f"Created early microcode cpio: {cpio_path.stat().st_size} bytes")
+
+    def _prepend_microcode_to_initrd(self, early_cpio: Path, initrd: Path) -> None:
+        """
+        Prepend early microcode cpio to initrd.
+
+        Args:
+            early_cpio: Path to early microcode cpio archive
+            initrd: Path to initrd.img file
+        """
+        if not initrd.exists():
+            return
+
+        initrd_orig = initrd.with_suffix(".img.orig")
+        # Backup original initrd using sudo (may be root-owned)
+        cat_cmd = f"cat {early_cpio} {initrd_orig} > {initrd}"
+        try:
+            subprocess.run(
+                ["sudo", "mv", str(initrd), str(initrd_orig)],
+                check=True,
+                capture_output=True,
+            )
+            # Combine: early_ucode + original_initrd
+            subprocess.run(
+                ["sudo", "sh", "-c", cat_cmd],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            # Attempt to restore the original initrd from the backup
+            try:
+                subprocess.run(
+                    ["sudo", "mv", str(initrd_orig), str(initrd)],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.SubprocessError:
+                logger.error(
+                    "Failed to restore original initrd from backup '%s'",
+                    initrd_orig,
+                )
+            raise
+        logger.info(
+            f"Combined initrd: {initrd.stat().st_size} bytes "
+            f"(was {initrd_orig.stat().st_size} bytes)"
+        )
+
     def build_early_microcode(self) -> None:
         """
         Build early microcode initramfs and prepend to initrd.
@@ -263,7 +364,6 @@ class ProxmoxISOBuilder:
 
             logger.info("Building early microcode initramfs...")
 
-            # Create temporary directory for cpio contents
             import tempfile
 
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -271,80 +371,24 @@ class ProxmoxISOBuilder:
                 ucode_dir = temp_path / "kernel" / "x86" / "microcode"
                 ucode_dir.mkdir(parents=True, exist_ok=True)
 
-                microcode_added = False
+                # Combine vendor microcode files
+                intel_added = self._combine_microcode_files(
+                    ucode_dir, intel_ucode, "GenuineIntel"
+                )
+                amd_added = self._combine_microcode_files(
+                    ucode_dir, amd_ucode, "AuthenticAMD"
+                )
 
-                # Combine Intel microcode
-                if intel_ucode.exists():
-                    intel_files = list(intel_ucode.glob("*"))
-                    if intel_files:
-                        intel_blob = ucode_dir / "GenuineIntel.bin"
-                        with intel_blob.open("wb") as out:
-                            for f in sorted(intel_files):
-                                if f.is_file() and not f.name.endswith(".initramfs"):
-                                    out.write(f.read_bytes())
-                        if intel_blob.stat().st_size > 0:
-                            logger.info(
-                                f"Intel microcode: {intel_blob.stat().st_size} bytes"
-                            )
-                            microcode_added = True
-
-                # Combine AMD microcode
-                if amd_ucode.exists():
-                    amd_files = list(amd_ucode.glob("*"))
-                    if amd_files:
-                        amd_blob = ucode_dir / "AuthenticAMD.bin"
-                        with amd_blob.open("wb") as out:
-                            for f in sorted(amd_files):
-                                if f.is_file():
-                                    out.write(f.read_bytes())
-                        if amd_blob.stat().st_size > 0:
-                            logger.info(
-                                f"AMD microcode: {amd_blob.stat().st_size} bytes"
-                            )
-                            microcode_added = True
-
-                if not microcode_added:
+                if not intel_added and not amd_added:
                     logger.warning("No microcode files found to add")
                     return
 
-                # Create early cpio archive (uncompressed, as required)
+                # Create and prepend cpio archive
                 early_cpio = self.config.work_dir / "early_ucode.cpio"
-                result = subprocess.run(
-                    ["find", ".", "-print0"],
-                    cwd=temp_path,
-                    capture_output=True,
-                    check=True,
-                )
-                subprocess.run(
-                    ["cpio", "-o", "-H", "newc", "-0"],
-                    input=result.stdout,
-                    cwd=temp_path,
-                    stdout=early_cpio.open("wb"),
-                    check=True,
-                )
+                self._create_early_cpio(temp_path, early_cpio)
 
-                logger.info(f"Created early microcode cpio: {early_cpio.stat().st_size} bytes")
-
-                # Prepend to initrd
                 initrd = self.iso_root / "boot" / "initrd.img"
-                if initrd.exists():
-                    initrd_orig = initrd.with_suffix(".img.orig")
-                    # Backup original initrd using sudo (may be root-owned)
-                    subprocess.run(
-                        ["sudo", "mv", str(initrd), str(initrd_orig)],
-                        check=True,
-                        capture_output=True,
-                    )
-                    # Combine: early_ucode + original_initrd
-                    subprocess.run(
-                        ["sudo", "sh", "-c", f"cat {early_cpio} {initrd_orig} > {initrd}"],
-                        check=True,
-                        capture_output=True,
-                    )
-                    logger.info(
-                        f"Combined initrd: {initrd.stat().st_size} bytes "
-                        f"(was {initrd_orig.stat().st_size} bytes)"
-                    )
+                self._prepend_microcode_to_initrd(early_cpio, initrd)
 
                 # Clean up
                 early_cpio.unlink(missing_ok=True)

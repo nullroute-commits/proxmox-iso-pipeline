@@ -72,15 +72,22 @@ class FirmwareManager:
 
         logger.info(f"Configuring apt sources for {self.debian_release}")
 
+        sources_file = Path(
+            f"/etc/apt/sources.list.d/{self.debian_release}-firmware.list"
+        )
+
+        # Check if we already created this file (avoid duplicates)
+        if sources_file.exists():
+            logger.debug("Firmware sources file already exists, skipping creation")
+            self._sources_configured = True
+            return
+
         # Create sources list for the target release including non-free
         sources_content = (
             f"deb {self.DEBIAN_REPO_BASE} {self.debian_release} "
             "main contrib non-free non-free-firmware\n"
             f"deb {self.DEBIAN_REPO_BASE} {self.debian_release}-updates "
             "main contrib non-free non-free-firmware\n"
-        )
-        sources_file = Path(
-            f"/etc/apt/sources.list.d/{self.debian_release}-firmware.list"
         )
 
         try:
@@ -132,15 +139,35 @@ class FirmwareManager:
             "amd": [
                 "firmware-amd-graphics",
                 "amd64-microcode",
-                "firmware-amd-microcode",
             ],
             "intel": [
                 "intel-microcode",
                 "firmware-intel-sound",
-                "firmware-intelwimax",
-                "i915-firmware",
+                "firmware-intel-graphics",
+                "firmware-intel-misc",
             ],
         }
+
+    def _validate_package_exists(self, package_name: str) -> bool:
+        """
+        Check if a package exists in the configured apt repositories.
+
+        Args:
+            package_name: Name of the package to validate
+
+        Returns:
+            True if package exists, False otherwise
+        """
+        try:
+            result = subprocess.run(
+                ["apt-cache", "show", package_name],
+                capture_output=True,
+                check=False,
+            )
+            return result.returncode == 0
+        except FileNotFoundError:
+            logger.warning("apt-cache not found, skipping package validation")
+            return True  # Assume exists if can't check
 
     def download_firmware(self, vendor: str, force: bool = False) -> List[Path]:
         """
@@ -171,6 +198,13 @@ class FirmwareManager:
             logger.info(f"Downloading {vendor} firmware packages: {packages}")
 
             for package_name in packages:
+                # Validate package exists before attempting download
+                if not self._validate_package_exists(package_name):
+                    logger.warning(
+                        f"Package '{package_name}' not found in repositories, skipping"
+                    )
+                    continue
+
                 try:
                     file_path = self._download_package(package_name, force)
                     if file_path:
@@ -333,7 +367,7 @@ class FirmwareManager:
                             temp_extract / "lib" / "firmware",
                             temp_extract / "usr" / "lib" / "firmware",
                         ]
-                        
+
                         for lib_firmware in firmware_paths:
                             if lib_firmware.exists():
                                 for item in lib_firmware.rglob("*"):

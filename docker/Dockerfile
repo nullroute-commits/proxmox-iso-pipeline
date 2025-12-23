@@ -14,6 +14,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Architecture argument for conditional package installation
 ARG TARGETARCH
 
+# Configure apt sources to include non-free and non-free-firmware repositories
+# This is required for firmware packages
+RUN echo "deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/firmware.list && \
+    echo "deb http://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list.d/firmware.list
+
 # Install architecture-independent system dependencies with pinned versions
 # These packages have the same version across all architectures
 RUN apt-get update && apt-get install -y \
@@ -23,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     wget=1.25.0-2 \
     curl=8.14.1-2+deb13u2 \
     isolinux=3:6.04~git20190206.bf6db5b4+dfsg1-3.1 \
+    cpio=2.15+dfsg-2 \
     sudo=1.9.16p2-3 \
     ca-certificates=20250419 \
     gnupg=2.4.7-21 \
@@ -137,7 +143,7 @@ RUN chmod +x /entrypoint.sh
 RUN useradd -m -u 1000 builder && \
     chown -R builder:builder /workspace && \
     echo "# Allow builder to run specific commands for ISO operations" >> /etc/sudoers && \
-    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /usr/bin/tee, /usr/bin/apt-get" >> /etc/sudoers
+    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /bin/mv, /bin/cat, /bin/sh, /usr/bin/tee, /usr/bin/apt-get" >> /etc/sudoers
 
 # Set default user
 USER builder
