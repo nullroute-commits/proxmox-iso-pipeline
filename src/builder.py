@@ -237,6 +237,120 @@ class ProxmoxISOBuilder:
             self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
             logger.info("Firmware integration complete")
 
+    def build_early_microcode(self) -> None:
+        """
+        Build early microcode initramfs and prepend to initrd.
+
+        This creates an uncompressed cpio archive containing CPU microcode
+        that gets loaded very early in the boot process, before the main
+        initramfs. This is critical for fixing MCE errors and ensuring
+        CPU stability.
+
+        Raises:
+            RuntimeError: If ISO root is not set
+        """
+        with track_performance("build_early_microcode", stage="microcode"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
+
+            firmware_dir = self.iso_root / "firmware"
+            intel_ucode = firmware_dir / "intel-ucode"
+            amd_ucode = firmware_dir / "amd-ucode"
+
+            if not intel_ucode.exists() and not amd_ucode.exists():
+                logger.warning("No microcode found, skipping early microcode build")
+                return
+
+            logger.info("Building early microcode initramfs...")
+
+            # Create temporary directory for cpio contents
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                ucode_dir = temp_path / "kernel" / "x86" / "microcode"
+                ucode_dir.mkdir(parents=True, exist_ok=True)
+
+                microcode_added = False
+
+                # Combine Intel microcode
+                if intel_ucode.exists():
+                    intel_files = list(intel_ucode.glob("*"))
+                    if intel_files:
+                        intel_blob = ucode_dir / "GenuineIntel.bin"
+                        with intel_blob.open("wb") as out:
+                            for f in sorted(intel_files):
+                                if f.is_file() and not f.name.endswith(".initramfs"):
+                                    out.write(f.read_bytes())
+                        if intel_blob.stat().st_size > 0:
+                            logger.info(
+                                f"Intel microcode: {intel_blob.stat().st_size} bytes"
+                            )
+                            microcode_added = True
+
+                # Combine AMD microcode
+                if amd_ucode.exists():
+                    amd_files = list(amd_ucode.glob("*"))
+                    if amd_files:
+                        amd_blob = ucode_dir / "AuthenticAMD.bin"
+                        with amd_blob.open("wb") as out:
+                            for f in sorted(amd_files):
+                                if f.is_file():
+                                    out.write(f.read_bytes())
+                        if amd_blob.stat().st_size > 0:
+                            logger.info(
+                                f"AMD microcode: {amd_blob.stat().st_size} bytes"
+                            )
+                            microcode_added = True
+
+                if not microcode_added:
+                    logger.warning("No microcode files found to add")
+                    return
+
+                # Create early cpio archive (uncompressed, as required)
+                early_cpio = self.config.work_dir / "early_ucode.cpio"
+                result = subprocess.run(
+                    ["find", ".", "-print0"],
+                    cwd=temp_path,
+                    capture_output=True,
+                    check=True,
+                )
+                subprocess.run(
+                    ["cpio", "-o", "-H", "newc", "-0"],
+                    input=result.stdout,
+                    cwd=temp_path,
+                    stdout=early_cpio.open("wb"),
+                    check=True,
+                )
+
+                logger.info(f"Created early microcode cpio: {early_cpio.stat().st_size} bytes")
+
+                # Prepend to initrd
+                initrd = self.iso_root / "boot" / "initrd.img"
+                if initrd.exists():
+                    initrd_orig = initrd.with_suffix(".img.orig")
+                    # Backup original initrd using sudo (may be root-owned)
+                    subprocess.run(
+                        ["sudo", "mv", str(initrd), str(initrd_orig)],
+                        check=True,
+                        capture_output=True,
+                    )
+                    # Combine: early_ucode + original_initrd
+                    subprocess.run(
+                        ["sudo", "sh", "-c", f"cat {early_cpio} {initrd_orig} > {initrd}"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    logger.info(
+                        f"Combined initrd: {initrd.stat().st_size} bytes "
+                        f"(was {initrd_orig.stat().st_size} bytes)"
+                    )
+
+                # Clean up
+                early_cpio.unlink(missing_ok=True)
+
+            logger.info("Early microcode loading configured")
+
     def validate_boot_files(self) -> bool:
         """
         Validate that required boot files exist in the ISO.
@@ -436,23 +550,27 @@ class ProxmoxISOBuilder:
             )
 
             # Download original ISO
-            console.print("[cyan]Step 1/5: Downloading Proxmox ISO[/cyan]")
+            console.print("[cyan]Step 1/6: Downloading Proxmox ISO[/cyan]")
             iso_path = self.download_iso(iso_url)
 
             # Extract ISO
-            console.print("[cyan]Step 2/5: Extracting ISO[/cyan]")
+            console.print("[cyan]Step 2/6: Extracting ISO[/cyan]")
             self.extract_iso(iso_path)
 
             # Download firmware
-            console.print("[cyan]Step 3/5: Downloading firmware packages[/cyan]")
+            console.print("[cyan]Step 3/6: Downloading firmware packages[/cyan]")
             firmware_packages = self.download_firmware_packages()
 
             # Integrate firmware
-            console.print("[cyan]Step 4/5: Integrating firmware[/cyan]")
+            console.print("[cyan]Step 4/6: Integrating firmware[/cyan]")
             self.integrate_firmware(firmware_packages)
 
+            # Build early microcode (critical for MCE fixes)
+            console.print("[cyan]Step 5/6: Building early microcode initramfs[/cyan]")
+            self.build_early_microcode()
+
             # Rebuild ISO
-            console.print("[cyan]Step 5/5: Rebuilding ISO[/cyan]")
+            console.print("[cyan]Step 6/6: Rebuilding ISO[/cyan]")
             output_iso = self.rebuild_iso()
 
             console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")

@@ -96,10 +96,20 @@ for deb_file in "$FIRMWARE_DIR"/*.deb; do
             continue
         }
         
-        # Copy firmware files if they exist
+        # Copy firmware files if they exist (check both /lib/firmware and /usr/lib/firmware)
+        COPIED=false
         if [ -d "$TEMP_DIR/lib/firmware" ]; then
             cp -r "$TEMP_DIR/lib/firmware/"* "$DEST_DIR/" 2>/dev/null || true
+            COPIED=true
+        fi
+        if [ -d "$TEMP_DIR/usr/lib/firmware" ]; then
+            cp -r "$TEMP_DIR/usr/lib/firmware/"* "$DEST_DIR/" 2>/dev/null || true
+            COPIED=true
+        fi
+        if [ "$COPIED" = true ]; then
             echo "[SUCCESS] Copied firmware from: $(basename "$deb_file")"
+        else
+            echo "[WARNING] No firmware found in: $(basename "$deb_file")"
         fi
         
         # Clean up

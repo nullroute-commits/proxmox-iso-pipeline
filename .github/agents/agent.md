@@ -21,16 +21,20 @@ proxmox-iso-pipeline/
 │       └── build-iso.yml      # CI/CD pipeline
 ├── src/
 │   ├── __init__.py
-│   ├── builder.py             # Main ISO builder
+│   ├── builder.py             # Main ISO builder (Python)
 │   ├── firmware.py            # Firmware integration
-│   └── config.py              # Configuration management
+│   ├── config.py              # Configuration management
+│   └── performance.py         # Performance tracking
 ├── docker/
 │   ├── Dockerfile             # Multi-stage build container
 │   └── entrypoint.sh          # Container entrypoint
 ├── scripts/
-│   ├── build-iso.sh           # Main build script
+│   ├── build-iso.sh           # Main build orchestrator
 │   ├── download-firmware.sh   # Firmware download script
-│   └── inject-firmware.sh     # Firmware injection script
+│   ├── inject-firmware.sh     # Firmware injection script
+│   ├── build-early-microcode.sh # Early microcode builder (MCE fixes)
+│   ├── rebuild-iso.sh         # ISO rebuild from modified contents
+│   └── validate-tools.sh      # Tool validation script
 ├── config/
 │   ├── preseed.cfg            # Debian preseed configuration
 │   └── firmware-sources.json  # Firmware sources definition
@@ -52,7 +56,7 @@ proxmox-iso-pipeline/
 - **Version Management**: All dependencies pinned to latest stable versions (see VERSIONS.md)
 
 ## Build Process Overview
-1. **Environment Setup**: Docker container with Debian Trixie base
+1. **Environment Setup**: Docker container with Debian Trixie base (or local build)
 2. **ISO Download**: Fetch official Proxmox VE 9.1 ISO
 3. **ISO Extraction**: Extract ISO contents to workspace
 4. **Firmware Integration**:
@@ -60,9 +64,28 @@ proxmox-iso-pipeline/
    - Add NVIDIA proprietary drivers
    - Add AMD GPU firmware
    - Add Intel microcode and GPU firmware
-5. **ISO Remastering**: Rebuild ISO with custom firmware
-6. **Multi-arch Support**: Build for multiple architectures using buildx
-7. **Artifact Generation**: Create downloadable ISO images
+   - Extract from both `/lib/firmware` and `/usr/lib/firmware` paths
+5. **Early Microcode Build**: Create early cpio for CPU microcode loading (fixes MCE errors)
+6. **ISO Remastering**: Rebuild ISO with custom firmware and microcode
+7. **Multi-arch Support**: Build for multiple architectures using buildx
+8. **Artifact Generation**: Create downloadable ISO images
+
+## Build Commands
+### Docker Build (Full Pipeline)
+```bash
+./scripts/build-iso.sh all        # Complete Docker build
+./scripts/build-iso.sh build      # Build ISO only
+./scripts/build-iso.sh lint       # Run linters
+```
+
+### Local Build (No Docker Required)
+```bash
+./scripts/build-iso.sh local              # Complete local pipeline
+./scripts/build-iso.sh download-firmware  # Download firmware packages
+./scripts/build-iso.sh inject-firmware    # Inject firmware into ISO
+./scripts/build-iso.sh build-microcode    # Build early microcode
+./scripts/build-iso.sh rebuild-iso        # Rebuild ISO from contents
+```
 
 ## Firmware Sources
 ### Freeware Firmware
@@ -276,7 +299,21 @@ services:
 - Verify firmware package names are correct
 - Check Debian repository availability
 - Ensure firmware files are placed in correct ISO location
+- **Modern Debian packages use `/usr/lib/firmware`** - the scripts check both paths
 - Test ISO boot in appropriate hardware/VM
+
+### MCE Errors and Boot Loop Issues
+MCE (Machine Check Exception) errors indicate hardware-level CPU issues. Solutions:
+1. **Early microcode loading** - Run `build-microcode` to prepend CPU microcode to initrd
+2. **GRUB boot options added** (in Advanced Options menu):
+   - `MCE Debug (Corrected Errors Only)` - `mce=dont_log_ce`
+   - `MCE Disabled` - `mce=off` (for testing only)
+   - `Safe Mode (No ACPI)` - `noapic nolapic acpi=off`
+3. **Hardware checks**:
+   - Run memtest86+ from boot menu
+   - Check CPU temperature
+   - Update BIOS/UEFI firmware
+   - Verify RAM stability
 
 ## References
 - [Proxmox VE Documentation](https://pve.proxmox.com/wiki/Main_Page)
@@ -300,6 +337,14 @@ When assisting with this project:
 10. **Keep** Docker images lean and efficient
 
 ## Version History
+- **v1.2.0**: MCE fix and local build pipeline
+  - Fixed firmware injection to check both `/lib/firmware` and `/usr/lib/firmware` paths
+  - Added early microcode loading (prepended to initrd) for MCE error fixes
+  - Added `build-early-microcode.sh` script for CPU microcode integration
+  - Added `rebuild-iso.sh` script for ISO reconstruction
+  - Added local build commands (no Docker required): `local`, `download-firmware`, `inject-firmware`, `build-microcode`, `rebuild-iso`
+  - Added MCE debug boot menu options in GRUB (mce=dont_log_ce, mce=off, safe mode)
+  - Python builder now includes 6-step process with early microcode build
 - **v1.1.0**: Architecture-specific builds and enhanced security
   - Divergent architecture flows for Dockerfile (shared vs arch-specific packages)
   - syslinux/syslinux-utils only installed on amd64 (x86-only bootloader)

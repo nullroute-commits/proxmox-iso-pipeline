@@ -119,6 +119,7 @@ INCLUDE_NVIDIA="${INCLUDE_NVIDIA:-true}"
 INCLUDE_AMD="${INCLUDE_AMD:-true}"
 INCLUDE_INTEL="${INCLUDE_INTEL:-true}"
 SKIP_VALIDATION="${SKIP_VALIDATION:-false}"
+BUILD_MODE="${BUILD_MODE:-docker}"  # docker or local
 
 print_info "Proxmox ISO Builder"
 print_info "==================="
@@ -127,6 +128,7 @@ print_info "Debian Release: $DEBIAN_RELEASE"
 print_info "Include NVIDIA: $INCLUDE_NVIDIA"
 print_info "Include AMD: $INCLUDE_AMD"
 print_info "Include Intel: $INCLUDE_INTEL"
+print_info "Build Mode: $BUILD_MODE"
 print_info ""
 
 # Check if Docker is available
@@ -186,6 +188,103 @@ build_iso() {
     print_success "ISO build completed"
 }
 
+# Function to download firmware packages locally
+download_firmware_local() {
+    start_timer "download_firmware"
+    print_info "Downloading firmware packages..."
+    
+    if [ -x "$SCRIPT_DIR/download-firmware.sh" ]; then
+        "$SCRIPT_DIR/download-firmware.sh"
+    else
+        print_error "Download firmware script not found: $SCRIPT_DIR/download-firmware.sh"
+        stop_timer "download_firmware"
+        return 1
+    fi
+    
+    stop_timer "download_firmware"
+    print_success "Firmware download completed"
+}
+
+# Function to inject firmware into ISO
+inject_firmware_local() {
+    start_timer "inject_firmware"
+    print_info "Injecting firmware into ISO..."
+    
+    if [ -x "$SCRIPT_DIR/inject-firmware.sh" ]; then
+        sudo "$SCRIPT_DIR/inject-firmware.sh" "$PROJECT_ROOT/work/iso_root" "$PROJECT_ROOT/firmware-cache"
+    else
+        print_error "Inject firmware script not found: $SCRIPT_DIR/inject-firmware.sh"
+        stop_timer "inject_firmware"
+        return 1
+    fi
+    
+    stop_timer "inject_firmware"
+    print_success "Firmware injection completed"
+}
+
+# Function to build early microcode
+build_early_microcode_local() {
+    start_timer "build_early_microcode"
+    print_info "Building early microcode initramfs..."
+    
+    if [ -x "$SCRIPT_DIR/build-early-microcode.sh" ]; then
+        sudo "$SCRIPT_DIR/build-early-microcode.sh" "$PROJECT_ROOT/work/iso_root"
+    else
+        print_error "Build early microcode script not found: $SCRIPT_DIR/build-early-microcode.sh"
+        stop_timer "build_early_microcode"
+        return 1
+    fi
+    
+    stop_timer "build_early_microcode"
+    print_success "Early microcode build completed"
+}
+
+# Function to rebuild ISO from modified contents
+rebuild_iso_local() {
+    start_timer "rebuild_iso"
+    print_info "Rebuilding ISO..."
+    
+    if [ -x "$SCRIPT_DIR/rebuild-iso.sh" ]; then
+        sudo "$SCRIPT_DIR/rebuild-iso.sh"
+    else
+        print_error "Rebuild ISO script not found: $SCRIPT_DIR/rebuild-iso.sh"
+        stop_timer "rebuild_iso"
+        return 1
+    fi
+    
+    stop_timer "rebuild_iso"
+    print_success "ISO rebuild completed"
+}
+
+# Function to run complete local build (firmware + microcode + rebuild)
+build_local() {
+    start_timer "build_local_total"
+    print_info "Running local build pipeline..."
+    
+    # Check for required ISO root
+    if [ ! -d "$PROJECT_ROOT/work/iso_root" ]; then
+        print_error "ISO root not found: $PROJECT_ROOT/work/iso_root"
+        print_info "Please extract a Proxmox ISO first or run the Docker build"
+        stop_timer "build_local_total"
+        return 1
+    fi
+    
+    # Download firmware
+    download_firmware_local || return 1
+    
+    # Inject firmware
+    inject_firmware_local || return 1
+    
+    # Build early microcode
+    build_early_microcode_local || return 1
+    
+    # Rebuild ISO
+    rebuild_iso_local || return 1
+    
+    stop_timer "build_local_total"
+    print_success "Local build completed successfully!"
+}
+
 # Main execution
 main() {
     start_timer "total_execution"
@@ -220,17 +319,41 @@ main() {
             run_linter
             build_iso
             ;;
+        # Local build commands (no Docker required)
+        download-firmware)
+            download_firmware_local
+            ;;
+        inject-firmware)
+            inject_firmware_local
+            ;;
+        build-microcode)
+            build_early_microcode_local
+            ;;
+        rebuild-iso)
+            rebuild_iso_local
+            ;;
+        local)
+            build_local
+            ;;
         help|--help|-h)
             echo "Proxmox ISO Builder"
             echo ""
-            echo "Usage: $0 {validate|build-image|lint|build|all|help}"
+            echo "Usage: $0 {command}"
             echo ""
-            echo "Commands:"
+            echo "Docker Build Commands:"
             echo "  validate    - Validate all required tools and permissions"
             echo "  build-image - Build Docker image only"
             echo "  lint        - Run code quality checks"
-            echo "  build       - Build the ISO (requires Docker image)"
-            echo "  all         - Run all steps (validate, build-image, lint, build)"
+            echo "  build       - Build the ISO using Docker (requires Docker image)"
+            echo "  all         - Run all Docker steps (validate, build-image, lint, build)"
+            echo ""
+            echo "Local Build Commands (no Docker required):"
+            echo "  download-firmware - Download firmware packages"
+            echo "  inject-firmware   - Inject firmware into ISO root"
+            echo "  build-microcode   - Build early microcode initramfs"
+            echo "  rebuild-iso       - Rebuild ISO from modified contents"
+            echo "  local             - Run complete local build pipeline"
+            echo ""
             echo "  help        - Show this help message"
             echo ""
             echo "Environment Variables:"
@@ -244,7 +367,7 @@ main() {
             ;;
         *)
             print_error "Unknown command: $1"
-            echo "Usage: $0 {validate|build-image|lint|build|all|help}"
+            echo "Usage: $0 {validate|build-image|lint|build|all|download-firmware|inject-firmware|build-microcode|rebuild-iso|local|help}"
             exit 1
             ;;
     esac

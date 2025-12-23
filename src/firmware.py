@@ -327,29 +327,36 @@ class FirmwareManager:
                         self.extract_firmware(package_path, temp_extract)
 
                         # Copy firmware files to ISO
-                        lib_firmware = temp_extract / "lib" / "firmware"
-                        if lib_firmware.exists():
-                            for item in lib_firmware.rglob("*"):
-                                if item.is_file():
-                                    rel_path = item.relative_to(lib_firmware)
-                                    dest = firmware_dir / rel_path
-                                    # Use sudo to create parent directory and copy
-                                    subprocess.run(
-                                        [
-                                            "sudo",
-                                            "mkdir",
-                                            "-p",
-                                            str(dest.parent),
-                                        ],
-                                        check=True,
-                                        capture_output=True,
-                                    )
-                                    subprocess.run(
-                                        ["sudo", "cp", "-p", str(item), str(dest)],
-                                        check=True,
-                                        capture_output=True,
-                                    )
-                                    logger.debug(f"Copied firmware: {rel_path}")
+                        # Check both /lib/firmware and /usr/lib/firmware paths
+                        # Modern Debian packages use /usr/lib/firmware
+                        firmware_paths = [
+                            temp_extract / "lib" / "firmware",
+                            temp_extract / "usr" / "lib" / "firmware",
+                        ]
+                        
+                        for lib_firmware in firmware_paths:
+                            if lib_firmware.exists():
+                                for item in lib_firmware.rglob("*"):
+                                    if item.is_file():
+                                        rel_path = item.relative_to(lib_firmware)
+                                        dest = firmware_dir / rel_path
+                                        # Use sudo to create parent dir and copy
+                                        subprocess.run(
+                                            [
+                                                "sudo",
+                                                "mkdir",
+                                                "-p",
+                                                str(dest.parent),
+                                            ],
+                                            check=True,
+                                            capture_output=True,
+                                        )
+                                        subprocess.run(
+                                            ["sudo", "cp", "-p", str(item), str(dest)],
+                                            check=True,
+                                            capture_output=True,
+                                        )
+                                        logger.debug(f"Copied firmware: {rel_path}")
 
                         # Clean up
                         shutil.rmtree(temp_extract, ignore_errors=True)
