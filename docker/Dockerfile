@@ -143,7 +143,7 @@ RUN chmod +x /entrypoint.sh
 RUN useradd -m -u 1000 builder && \
     chown -R builder:builder /workspace && \
     echo "# Allow builder to run specific commands for ISO operations" >> /etc/sudoers && \
-    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /bin/mv, /bin/cat, /bin/sh, /usr/bin/tee, /usr/bin/apt-get" >> /etc/sudoers
+    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /bin/mv, /bin/cat, /bin/sh, /bin/rm, /usr/bin/tee, /usr/bin/apt-get, /usr/bin/unsquashfs, /usr/bin/mksquashfs" >> /etc/sudoers
 
 # Set default user
 USER builder
