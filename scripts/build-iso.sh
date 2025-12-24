@@ -239,10 +239,26 @@ build_early_microcode_local() {
     print_success "Early microcode build completed"
 }
 
+# Function to copy post-install helper script to ISO
+copy_post_install_script() {
+    print_info "Adding post-install firmware helper script to ISO..."
+    
+    if [ -f "$SCRIPT_DIR/post-install-firmware.sh" ]; then
+        sudo cp "$SCRIPT_DIR/post-install-firmware.sh" "$PROJECT_ROOT/work/iso_root/"
+        sudo chmod +x "$PROJECT_ROOT/work/iso_root/post-install-firmware.sh"
+        print_success "Post-install script added to ISO root"
+    else
+        print_warning "Post-install script not found: $SCRIPT_DIR/post-install-firmware.sh"
+    fi
+}
+
 # Function to rebuild ISO from modified contents
 rebuild_iso_local() {
     start_timer "rebuild_iso"
     print_info "Rebuilding ISO..."
+    
+    # Copy post-install helper script
+    copy_post_install_script
     
     if [ -x "$SCRIPT_DIR/rebuild-iso.sh" ]; then
         sudo "$SCRIPT_DIR/rebuild-iso.sh"

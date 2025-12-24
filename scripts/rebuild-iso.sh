@@ -150,6 +150,12 @@ if [ -f "$OUTPUT_ISO" ]; then
     echo "  - Early microcode: $(test -f "$ISO_ROOT/boot/initrd.img.orig" && echo 'Yes (combined with initrd)' || echo 'No')"
     echo "  - BIOS boot: $([ "$HAS_GRUB_BIOS" = true ] || [ "$HAS_ISOLINUX" = true ] && echo 'Yes' || echo 'No')"
     echo "  - UEFI boot: $([ "$HAS_GRUB_EFI" = true ] && echo 'Yes' || echo 'No')"
+    echo "  - Post-install script: $(test -f "$ISO_ROOT/post-install-firmware.sh" && echo 'Yes' || echo 'No')"
+    echo ""
+    echo -e "${YELLOW}[IMPORTANT]${NC} After installation, run the post-install firmware script:"
+    echo "  1. Press Ctrl+Alt+F2 to get a shell"
+    echo "  2. Run: /cdrom/post-install-firmware.sh"
+    echo "  3. Then reboot"
 else
     echo -e "${RED}[ERROR]${NC} ISO file not created"
     exit 1

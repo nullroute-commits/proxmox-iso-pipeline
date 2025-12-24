@@ -380,6 +380,58 @@ class ProxmoxISOBuilder:
 
             logger.info("Early microcode loading configured")
 
+    def copy_post_install_script(self) -> None:
+        """
+        Copy post-install firmware helper script to ISO root.
+
+        This script helps users copy firmware to the installed system
+        and rebuild the initramfs after Proxmox installation completes.
+
+        Raises:
+            RuntimeError: If ISO root is not set
+        """
+        with track_performance("copy_post_install_script", stage="scripts"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
+
+            # Find the post-install script
+            script_locations = [
+                Path(__file__).parent.parent / "scripts" / "post-install-firmware.sh",
+                Path("scripts/post-install-firmware.sh"),
+                Path("/workspace/scripts/post-install-firmware.sh"),
+            ]
+
+            script_path = None
+            for loc in script_locations:
+                if loc.exists():
+                    script_path = loc
+                    break
+
+            if script_path is None:
+                logger.warning(
+                    "Post-install firmware script not found, skipping. "
+                    "Users will need to manually copy firmware after installation."
+                )
+                return
+
+            dest_path = self.iso_root / "post-install-firmware.sh"
+            logger.info(f"Copying post-install script to ISO: {dest_path}")
+
+            try:
+                subprocess.run(
+                    ["sudo", "cp", str(script_path), str(dest_path)],
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["sudo", "chmod", "+x", str(dest_path)],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info("Post-install helper script added to ISO root")
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Failed to copy post-install script: {e}")
+
     def validate_boot_files(self) -> bool:
         """
         Validate that required boot files exist in the ISO.
@@ -591,18 +643,26 @@ class ProxmoxISOBuilder:
             firmware_packages = self.download_firmware_packages()
 
             # Integrate firmware
-            console.print("[cyan]Step 4/6: Integrating firmware[/cyan]")
+            console.print("[cyan]Step 4/7: Integrating firmware[/cyan]")
             self.integrate_firmware(firmware_packages)
 
             # Build early microcode (critical for MCE fixes)
-            console.print("[cyan]Step 5/6: Building early microcode initramfs[/cyan]")
+            console.print("[cyan]Step 5/7: Building early microcode initramfs[/cyan]")
             self.build_early_microcode()
 
+            # Copy post-install helper script
+            console.print("[cyan]Step 6/7: Adding post-install helper script[/cyan]")
+            self.copy_post_install_script()
+
             # Rebuild ISO
-            console.print("[cyan]Step 6/6: Rebuilding ISO[/cyan]")
+            console.print("[cyan]Step 7/7: Rebuilding ISO[/cyan]")
             output_iso = self.rebuild_iso()
 
             console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
+            console.print(
+                "[yellow]IMPORTANT: After installation, run /cdrom/post-install-firmware.sh "
+                "before rebooting to copy firmware to the installed system.[/yellow]"
+            )
 
         # Print performance summary
         console.print("\n")

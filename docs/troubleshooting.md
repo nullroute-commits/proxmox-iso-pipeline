@@ -2,7 +2,7 @@
 
 > **Documentation Version:** 1.0.0  
 > **Audience:** All Users  
-> **Last Updated:** 2024-12-19
+> **Last Updated:** 2024-12-23
 
 Common issues, solutions, and debugging tips for the Proxmox ISO Pipeline.
 
@@ -13,6 +13,7 @@ Common issues, solutions, and debugging tips for the Proxmox ISO Pipeline.
 - [Docker Issues](#docker-issues)
 - [Firmware Issues](#firmware-issues)
 - [Boot Issues](#boot-issues)
+- [Post-Install Boot Issues](#post-install-boot-issues)
 - [Installation Issues](#installation-issues)
 - [Getting Help](#getting-help)
 
@@ -431,6 +432,127 @@ This indicates the source ISO may be corrupted or incompatible.
 # Re-download source ISO
 rm -f work/proxmox-ve_*.iso
 docker compose run --rm builder build
+```
+
+## Post-Install Boot Issues
+
+### Issue: System Hangs After Loading Initramfs
+
+**Symptoms:**
+- Installation completes successfully
+- After removing install media, system starts booting
+- Kernel loads, initramfs loads
+- System hangs with no further output (black screen or stuck on "Loading initial ramdisk...")
+- No login prompt appears
+
+**Root Cause:**
+The installed system's initramfs is missing firmware required to access the storage controller (NVMe, AHCI, RAID, SAS/HBA). The custom ISO provides firmware to the **installer environment**, but the Proxmox installer does not automatically copy this firmware to the installed system's `/lib/firmware` directory.
+
+**Solution - Recovery via Live Environment:**
+
+1. **Boot from the custom ISO again**
+
+2. **Access a shell** - At the installer menu, press `Ctrl+Alt+F2` to get a terminal
+
+3. **Identify and mount your root partition:**
+```bash
+# List available partitions
+lsblk
+fdisk -l
+
+# Mount root partition (examples for different setups)
+# NVMe:
+mount /dev/nvme0n1p2 /mnt
+
+# SATA:
+mount /dev/sda2 /mnt
+
+# LVM (most common for Proxmox):
+vgchange -ay  # Activate volume groups
+mount /dev/mapper/pve-root /mnt
+```
+
+4. **Bind mount required filesystems:**
+```bash
+mount --bind /dev /mnt/dev
+mount --bind /proc /mnt/proc
+mount --bind /sys /mnt/sys
+mount --bind /run /mnt/run
+```
+
+5. **Chroot into the installed system:**
+```bash
+chroot /mnt /bin/bash
+```
+
+6. **Copy firmware from the installer media:**
+```bash
+# The ISO should be mounted at /cdrom or similar
+# If not, mount it manually:
+mkdir -p /mnt2
+mount /dev/sr0 /mnt2  # CD/DVD drive
+# or for USB:
+mount /dev/sdb1 /mnt2
+
+# Copy all firmware
+cp -r /mnt2/firmware/* /lib/firmware/
+# or if using /cdrom:
+cp -r /cdrom/firmware/* /lib/firmware/
+```
+
+7. **Rebuild the initramfs:**
+```bash
+update-initramfs -u -k all
+```
+
+8. **Exit and reboot:**
+```bash
+exit
+umount -R /mnt
+reboot
+```
+
+**Prevention for Future Installs:**
+
+After a fresh install from the custom ISO, always run these commands before rebooting:
+
+```bash
+# From the installer shell (Ctrl+Alt+F2)
+# Mount the newly installed system
+mount /dev/mapper/pve-root /mnt  # Adjust as needed
+
+# Copy firmware
+cp -r /cdrom/firmware/* /mnt/lib/firmware/
+
+# Chroot and rebuild initramfs
+mount --bind /dev /mnt/dev
+mount --bind /proc /mnt/proc
+mount --bind /sys /mnt/sys
+chroot /mnt update-initramfs -u -k all
+umount /mnt/dev /mnt/proc /mnt/sys
+umount /mnt
+```
+
+### Issue: System Boots But Missing Hardware
+
+**Symptoms:**
+- System boots to login
+- Some hardware (GPU, network, storage controller) not detected
+- `dmesg` shows firmware loading errors
+
+**Solution:**
+```bash
+# Copy firmware from the ISO to the running system
+# Insert/mount the custom ISO
+mount /dev/sr0 /mnt
+cp -r /mnt/firmware/* /lib/firmware/
+umount /mnt
+
+# Reload modules or reboot
+modprobe -r <driver_name>
+modprobe <driver_name>
+# or
+reboot
 ```
 
 ## Installation Issues
