@@ -355,13 +355,12 @@ git push origin main
 #### AMD
 - `firmware-amd-graphics` - AMD GPU firmware
 - `amd64-microcode` - AMD CPU microcode updates
-- `firmware-amd-microcode` - Additional AMD microcode
 
 #### Intel
 - `intel-microcode` - Intel CPU microcode updates
 - `firmware-intel-sound` - Intel audio firmware
-- `firmware-intelwimax` - Intel WiMAX firmware
-- `i915-firmware` - Intel graphics firmware
+- `firmware-intel-graphics` - Intel integrated graphics firmware
+- `firmware-intel-misc` - Miscellaneous Intel firmware
 
 ## Boot Compatibility
 

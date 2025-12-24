@@ -262,14 +262,13 @@ The firmware packages are defined in `config/firmware-sources.json`:
   ],
   "amd": [
     "firmware-amd-graphics",
-    "amd64-microcode",
-    "firmware-amd-microcode"
+    "amd64-microcode"
   ],
   "intel": [
     "intel-microcode",
     "firmware-intel-sound",
-    "firmware-intelwimax",
-    "i915-firmware"
+    "firmware-intel-graphics",
+    "firmware-intel-misc"
   ]
 }
 ```
@@ -307,7 +306,6 @@ The firmware packages are defined in `config/firmware-sources.json`:
 |---------|-------------|
 | `firmware-amd-graphics` | AMD GPU (AMDGPU) firmware |
 | `amd64-microcode` | AMD CPU microcode updates |
-| `firmware-amd-microcode` | Additional AMD microcode |
 
 #### Intel Packages
 
@@ -315,8 +313,8 @@ The firmware packages are defined in `config/firmware-sources.json`:
 |---------|-------------|
 | `intel-microcode` | Intel CPU microcode updates |
 | `firmware-intel-sound` | Intel audio DSP firmware |
-| `firmware-intelwimax` | Intel WiMAX firmware |
-| `i915-firmware` | Intel integrated graphics firmware |
+| `firmware-intel-graphics` | Intel integrated graphics firmware |
+| `firmware-intel-misc` | Miscellaneous Intel firmware |
 
 ### Customizing Firmware Sources
 
