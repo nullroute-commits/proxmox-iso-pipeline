@@ -125,8 +125,8 @@ Firmware packages are downloaded from Debian repositories and versions are deter
 
 ### Proprietary Firmware
 - **NVIDIA**: nvidia-driver, nvidia-kernel-dkms, firmware-nvidia-graphics
-- **AMD**: firmware-amd-graphics, amd64-microcode, firmware-amd-microcode
-- **Intel**: intel-microcode, firmware-intel-sound, firmware-intelwimax, i915-firmware
+- **AMD**: firmware-amd-graphics, amd64-microcode
+- **Intel**: intel-microcode, firmware-intel-sound, firmware-intel-graphics, firmware-intel-misc
 
 ## Version Update Process
 
