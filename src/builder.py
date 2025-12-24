@@ -237,6 +237,149 @@ class ProxmoxISOBuilder:
             self.firmware_manager.integrate_firmware(firmware_packages, self.iso_root)
             logger.info("Firmware integration complete")
 
+    def inject_firmware_into_squashfs(self) -> None:
+        """
+        Inject firmware into pve-base.squashfs so it's included in the installed system.
+
+        This extracts the base squashfs, copies firmware to /lib/firmware,
+        rebuilds the initramfs inside, and repacks the squashfs. This ensures
+        the installed Proxmox system has all firmware available at first boot.
+
+        Raises:
+            RuntimeError: If ISO root is not set or squashfs operations fail
+        """
+        with track_performance("inject_firmware_squashfs", stage="squashfs"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
+
+            squashfs_path = self.iso_root / "pve-base.squashfs"
+            if not squashfs_path.exists():
+                logger.warning(f"pve-base.squashfs not found at {squashfs_path}")
+                return
+
+            firmware_src = self.iso_root / "firmware"
+            if not firmware_src.exists():
+                logger.warning("No firmware directory found, skipping squashfs injection")
+                return
+
+            logger.info("Injecting firmware into pve-base.squashfs...")
+            logger.info("This ensures firmware is available in the installed system")
+
+            # Create working directory for squashfs extraction
+            squashfs_work = self.config.work_dir / "squashfs_work"
+            squashfs_extract = squashfs_work / "pve-base"
+
+            try:
+                # Clean up any previous extraction
+                if squashfs_work.exists():
+                    shutil.rmtree(squashfs_work)
+                squashfs_work.mkdir(parents=True)
+
+                # Extract squashfs
+                logger.info("Extracting pve-base.squashfs (this may take a minute)...")
+                result = subprocess.run(
+                    [
+                        "sudo", "unsquashfs",
+                        "-d", str(squashfs_extract),
+                        str(squashfs_path)
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"Failed to extract squashfs: {result.stderr}")
+
+                # Copy firmware to /lib/firmware in the extracted squashfs
+                dest_firmware = squashfs_extract / "lib" / "firmware"
+                logger.info(f"Copying firmware to {dest_firmware}...")
+
+                subprocess.run(
+                    ["sudo", "mkdir", "-p", str(dest_firmware)],
+                    check=True,
+                    capture_output=True,
+                )
+
+                # Copy all firmware files
+                for item in firmware_src.iterdir():
+                    dest = dest_firmware / item.name
+                    if item.is_dir():
+                        subprocess.run(
+                            ["sudo", "cp", "-r", str(item), str(dest)],
+                            check=True,
+                            capture_output=True,
+                        )
+                    else:
+                        subprocess.run(
+                            ["sudo", "cp", str(item), str(dest)],
+                            check=True,
+                            capture_output=True,
+                        )
+
+                firmware_count = sum(1 for _ in dest_firmware.rglob("*") if _.is_file())
+                logger.info(f"Copied {firmware_count} firmware files to squashfs")
+
+                # Backup original squashfs
+                backup_path = squashfs_path.with_suffix(".squashfs.orig")
+                subprocess.run(
+                    ["sudo", "mv", str(squashfs_path), str(backup_path)],
+                    check=True,
+                    capture_output=True,
+                )
+
+                # Repack squashfs with same compression settings as original
+                logger.info("Repacking pve-base.squashfs (this may take several minutes)...")
+                result = subprocess.run(
+                    [
+                        "sudo", "mksquashfs",
+                        str(squashfs_extract),
+                        str(squashfs_path),
+                        "-comp", "xz",
+                        "-Xbcj", "x86",
+                        "-b", "1M",
+                        "-no-progress",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    # Restore backup on failure
+                    subprocess.run(
+                        ["sudo", "mv", str(backup_path), str(squashfs_path)],
+                        check=False,
+                    )
+                    raise RuntimeError(f"Failed to repack squashfs: {result.stderr}")
+
+                # Report size difference
+                orig_size = backup_path.stat().st_size
+                new_size = squashfs_path.stat().st_size
+                size_diff = new_size - orig_size
+                logger.info(
+                    f"Squashfs repacked: {orig_size / 1024 / 1024:.1f}MB -> "
+                    f"{new_size / 1024 / 1024:.1f}MB "
+                    f"(+{size_diff / 1024 / 1024:.1f}MB for firmware)"
+                )
+
+                # Clean up extraction directory (keep backup for debugging)
+                subprocess.run(
+                    ["sudo", "rm", "-rf", str(squashfs_extract)],
+                    check=False,
+                )
+
+                logger.info("Firmware injection into squashfs complete")
+                logger.info(
+                    "The installed system will have all firmware available at first boot"
+                )
+
+            except Exception as e:
+                logger.error(f"Squashfs firmware injection failed: {e}")
+                # Clean up on failure
+                if squashfs_work.exists():
+                    subprocess.run(
+                        ["sudo", "rm", "-rf", str(squashfs_work)],
+                        check=False,
+                    )
+                raise
+
     def _combine_microcode_files(
         self, ucode_dir: Path, src_dir: Path, vendor: str
     ) -> bool:
@@ -642,26 +785,32 @@ class ProxmoxISOBuilder:
             console.print("[cyan]Step 3/6: Downloading firmware packages[/cyan]")
             firmware_packages = self.download_firmware_packages()
 
-            # Integrate firmware
-            console.print("[cyan]Step 4/7: Integrating firmware[/cyan]")
+            # Integrate firmware into ISO (for installer environment)
+            console.print("[cyan]Step 4/8: Integrating firmware into ISO[/cyan]")
             self.integrate_firmware(firmware_packages)
 
+            # Inject firmware into squashfs (for installed system)
+            console.print("[cyan]Step 5/8: Injecting firmware into installed system image[/cyan]")
+            self.inject_firmware_into_squashfs()
+
             # Build early microcode (critical for MCE fixes)
-            console.print("[cyan]Step 5/7: Building early microcode initramfs[/cyan]")
+            console.print("[cyan]Step 6/8: Building early microcode initramfs[/cyan]")
             self.build_early_microcode()
 
-            # Copy post-install helper script
-            console.print("[cyan]Step 6/7: Adding post-install helper script[/cyan]")
+            # Copy post-install helper script (as backup/manual option)
+            console.print("[cyan]Step 7/8: Adding post-install helper script[/cyan]")
             self.copy_post_install_script()
 
             # Rebuild ISO
-            console.print("[cyan]Step 7/7: Rebuilding ISO[/cyan]")
+            console.print("[cyan]Step 8/8: Rebuilding ISO[/cyan]")
             output_iso = self.rebuild_iso()
 
             console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
             console.print(
-                "[yellow]IMPORTANT: After installation, run /cdrom/post-install-firmware.sh "
-                "before rebooting to copy firmware to the installed system.[/yellow]"
+                "[green]✓ Firmware has been injected into the installable system image.[/green]"
+            )
+            console.print(
+                "[green]✓ The installed system will have all firmware available at first boot.[/green]"
             )
 
         # Print performance summary

@@ -436,6 +436,11 @@ docker compose run --rm builder build
 
 ## Post-Install Boot Issues
 
+> **Note:** As of the latest pipeline version, firmware is automatically injected into the 
+> `pve-base.squashfs` image, which means the installed system should have all firmware 
+> available at first boot. The issues below apply to older ISOs or ISOs built without 
+> the squashfs injection step.
+
 ### Issue: System Hangs After Loading Initramfs
 
 **Symptoms:**
@@ -446,9 +451,17 @@ docker compose run --rm builder build
 - No login prompt appears
 
 **Root Cause:**
-The installed system's initramfs is missing firmware required to access the storage controller (NVMe, AHCI, RAID, SAS/HBA). The custom ISO provides firmware to the **installer environment**, but the Proxmox installer does not automatically copy this firmware to the installed system's `/lib/firmware` directory.
+The installed system's initramfs is missing firmware required to access the storage controller (NVMe, AHCI, RAID, SAS/HBA). This typically happens with ISOs that didn't have firmware injected into the squashfs image.
 
-**Solution - Recovery via Live Environment:**
+**Quick Fix (if using latest pipeline):**
+Rebuild the ISO using the latest pipeline version which automatically injects firmware into the installable system image:
+```bash
+cd proxmox-iso-pipeline
+git pull
+./scripts/build-iso.sh local
+```
+
+**Manual Recovery (for older ISOs):**
 
 1. **Boot from the custom ISO again**
 

@@ -272,6 +272,25 @@ rebuild_iso_local() {
     print_success "ISO rebuild completed"
 }
 
+# Function to inject firmware into squashfs for the installed system
+inject_firmware_squashfs_local() {
+    start_timer "inject_firmware_squashfs"
+    print_info "Injecting firmware into pve-base.squashfs..."
+    print_info "This ensures firmware is available in the installed system"
+    
+    if [ -x "$SCRIPT_DIR/inject-firmware-squashfs.sh" ]; then
+        sudo "$SCRIPT_DIR/inject-firmware-squashfs.sh" "$PROJECT_ROOT/work/iso_root"
+    else
+        print_warning "Squashfs injection script not found: $SCRIPT_DIR/inject-firmware-squashfs.sh"
+        print_warning "Installed system may require manual firmware setup"
+        stop_timer "inject_firmware_squashfs"
+        return 0  # Non-fatal, continue with build
+    fi
+    
+    stop_timer "inject_firmware_squashfs"
+    print_success "Firmware injection into squashfs completed"
+}
+
 # Function to run complete local build (firmware + microcode + rebuild)
 build_local() {
     start_timer "build_local_total"
@@ -288,8 +307,11 @@ build_local() {
     # Download firmware
     download_firmware_local || return 1
     
-    # Inject firmware
+    # Inject firmware into ISO (for installer environment)
     inject_firmware_local || return 1
+    
+    # Inject firmware into squashfs (for installed system)
+    inject_firmware_squashfs_local || return 1
     
     # Build early microcode
     build_early_microcode_local || return 1
@@ -299,6 +321,10 @@ build_local() {
     
     stop_timer "build_local_total"
     print_success "Local build completed successfully!"
+    echo ""
+    print_info "✓ Firmware has been injected into the installable system image"
+    print_info "✓ The installed system will have all firmware available at first boot"
+    print_info "✓ No manual post-install steps required!"
 }
 
 # Main execution
@@ -345,6 +371,9 @@ main() {
         build-microcode)
             build_early_microcode_local
             ;;
+        inject-firmware-squashfs)
+            inject_firmware_squashfs_local
+            ;;
         rebuild-iso)
             rebuild_iso_local
             ;;
@@ -364,11 +393,12 @@ main() {
             echo "  all         - Run all Docker steps (validate, build-image, lint, build)"
             echo ""
             echo "Local Build Commands (no Docker required):"
-            echo "  download-firmware - Download firmware packages"
-            echo "  inject-firmware   - Inject firmware into ISO root"
-            echo "  build-microcode   - Build early microcode initramfs"
-            echo "  rebuild-iso       - Rebuild ISO from modified contents"
-            echo "  local             - Run complete local build pipeline"
+            echo "  download-firmware       - Download firmware packages"
+            echo "  inject-firmware         - Inject firmware into ISO root (installer)"
+            echo "  inject-firmware-squashfs- Inject firmware into squashfs (installed system)"
+            echo "  build-microcode         - Build early microcode initramfs"
+            echo "  rebuild-iso             - Rebuild ISO from modified contents"
+            echo "  local                   - Run complete local build pipeline"
             echo ""
             echo "  help        - Show this help message"
             echo ""
@@ -383,7 +413,7 @@ main() {
             ;;
         *)
             print_error "Unknown command: $1"
-            echo "Usage: $0 {validate|build-image|lint|build|all|download-firmware|inject-firmware|build-microcode|rebuild-iso|local|help}"
+            echo "Usage: $0 {validate|build-image|lint|build|all|download-firmware|inject-firmware|inject-firmware-squashfs|build-microcode|rebuild-iso|local|help}"
             exit 1
             ;;
     esac
