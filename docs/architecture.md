@@ -2,7 +2,7 @@
 
 > **Documentation Version:** 1.0.0  
 > **Audience:** Technical Staff, System Architects  
-> **Last Updated:** 2024-12-19
+> **Last Updated:** 2025-12-25
 
 This document describes the system architecture, component design, and data flow of the Proxmox ISO Pipeline.
 
@@ -154,6 +154,16 @@ The Proxmox ISO Pipeline is a containerized build system that creates custom Pro
                          │
                          ▼
             ┌─────────────────────────┐
+            │ EARLY MICROCODE PHASE   │
+            │                         │
+            │ • Combine Intel/AMD     │
+            │   microcode blobs       │
+            │ • Create early cpio     │
+            │ • Prepend to initrd.img │
+            └────────────┬────────────┘
+                         │
+                         ▼
+            ┌─────────────────────────┐
             │ VALIDATION PHASE        │
             │                         │
             │ • Check EFI boot files  │
@@ -194,8 +204,10 @@ proxmox-iso-pipeline/
 │   └── entrypoint.sh             # Container entrypoint
 ├── scripts/                      # Shell scripts
 │   ├── build-iso.sh              # Main build script
+│   ├── build-early-microcode.sh  # Early microcode initramfs builder
 │   ├── download-firmware.sh      # Firmware download
 │   ├── inject-firmware.sh        # Firmware injection
+│   ├── rebuild-iso.sh            # ISO rebuild script
 │   └── validate-tools.sh         # Tool validation script
 ├── work/                         # Working directory (gitignored)
 │   ├── iso_root/                 # Extracted ISO contents
@@ -226,9 +238,13 @@ proxmox-iso-pipeline/
 │   + extract_iso(iso_path) -> Path                                │
 │   + download_firmware_packages() -> List[Path]                   │
 │   + integrate_firmware(packages) -> None                         │
+│   + build_early_microcode() -> None                              │
 │   + validate_boot_files() -> bool                                │
 │   + rebuild_iso(output_name?) -> Path                            │
 │   + build(iso_url?) -> Path                                      │
+│   - _combine_microcode_files(...) -> bool                        │
+│   - _create_early_cpio(temp_path, cpio_path) -> None             │
+│   - _prepend_microcode_to_initrd(cpio, initrd) -> None           │
 │   - _find_mbr_template() -> Optional[Path]                       │
 └─────────────────────────────────────────────────────────────────┘
 ```

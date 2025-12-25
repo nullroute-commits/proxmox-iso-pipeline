@@ -1,7 +1,7 @@
 # Proxmox ISO Pipeline Documentation
 
 > **Documentation Version:** 1.0.0  
-> **Last Updated:** 2024-12-19  
+> **Last Updated:** 2025-12-25  
 > **Proxmox VE Target:** 9.1  
 > **Debian Base:** Trixie (Debian 13)
 

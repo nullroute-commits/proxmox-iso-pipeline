@@ -3,7 +3,7 @@
 This document tracks all pinned versions used in the Proxmox ISO Pipeline project.
 
 ## Last Updated
-2024-12-19
+2025-12-25
 
 ## Python Runtime
 - **Python**: 3.13.0
@@ -196,5 +196,5 @@ Firmware packages are downloaded from Debian repositories and versions are deter
 
 ---
 
-Last reviewed: 2024-12-19
-Next review due: 2025-01-19
+Last reviewed: 2025-12-25
+Next review due: 2026-01-25

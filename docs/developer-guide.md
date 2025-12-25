@@ -205,6 +205,9 @@ docker compose run --rm linter
 
 ### Test Structure
 
+> **Note:** The test infrastructure is planned but not yet implemented. 
+> The structure below shows the intended test organization.
+
 ```
 proxmox-iso-pipeline/
 ├── tests/
