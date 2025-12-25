@@ -2,7 +2,7 @@
 
 > **Documentation Version:** 1.0.0  
 > **Audience:** All Users  
-> **Last Updated:** 2024-12-19
+> **Last Updated:** 2025-12-25
 
 Common issues, solutions, and debugging tips for the Proxmox ISO Pipeline.
 

@@ -168,8 +168,10 @@ proxmox-iso-pipeline/
 │   └── entrypoint.sh             # Container entrypoint script
 ├── scripts/
 │   ├── build-iso.sh              # Main build orchestration script
+│   ├── build-early-microcode.sh  # Early microcode initramfs builder
 │   ├── download-firmware.sh      # Firmware download script
 │   ├── inject-firmware.sh        # Firmware injection script
+│   ├── rebuild-iso.sh            # ISO rebuild script
 │   └── validate-tools.sh         # Tool validation script
 ├── config/
 │   ├── preseed.cfg               # Debian preseed configuration

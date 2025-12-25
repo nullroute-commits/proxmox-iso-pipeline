@@ -2,7 +2,7 @@
 
 > **Documentation Version:** 1.0.0  
 > **Audience:** Developers  
-> **Last Updated:** 2024-12-19
+> **Last Updated:** 2025-12-25
 
 Python API documentation for the Proxmox ISO Pipeline modules.
 
@@ -235,6 +235,32 @@ def rebuild_iso(self, output_name: Optional[str] = None) -> Path:
     """
 ```
 
+##### build_early_microcode
+
+```python
+def build_early_microcode(self) -> None:
+    """
+    Build early microcode initramfs and prepend to initrd.
+
+    This creates an uncompressed cpio archive containing CPU microcode
+    that gets loaded very early in the boot process, before the main
+    initramfs. This is critical for fixing MCE errors and ensuring
+    CPU stability.
+
+    The method:
+    1. Locates Intel and AMD microcode files in the firmware directory
+    2. Combines them into vendor-specific binary blobs
+    3. Creates an early microcode cpio archive
+    4. Prepends it to the initrd.img file
+
+    Raises:
+        RuntimeError: If ISO root is not set (extract_iso not called).
+
+    Example:
+        >>> builder.build_early_microcode()
+    """
+```
+
 ##### build
 
 ```python
@@ -247,7 +273,8 @@ def build(self, iso_url: Optional[str] = None) -> Path:
     2. Extract ISO contents
     3. Download firmware packages
     4. Integrate firmware
-    5. Rebuild ISO
+    5. Build early microcode initramfs
+    6. Rebuild ISO
 
     Args:
         iso_url: Optional custom Proxmox ISO URL.
