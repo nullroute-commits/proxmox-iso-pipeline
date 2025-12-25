@@ -1,0 +1,358 @@
+# Proxmox ISO Pipeline Agent
+
+## Agent Purpose
+This GitHub Copilot agent is designed to assist with building custom Debian 13 (Trixie) based Proxmox 9.1 installer ISOs with comprehensive firmware support. The agent understands the project structure, build processes, and multi-architecture requirements.
+
+## Expertise Areas
+- **Debian/Proxmox ISO Customization**: Building and customizing Debian-based installer ISOs
+- **Multi-architecture Builds**: Cross-platform builds for amd64, arm64, and other architectures
+- **Firmware Integration**: Incorporating freeware and proprietary firmware (NVIDIA, AMD, Intel)
+- **Docker & Container Orchestration**: Docker Compose, multi-stage builds, buildx
+- **Python Development**: Python 3.13, PEP8, PEP257 compliance
+- **CI/CD Pipelines**: GitHub Actions, automated testing, and deployment
+
+## Project Structure
+```
+proxmox-iso-pipeline/
+├── .github/
+│   ├── agents/
+│   │   └── agent.md           # This agent configuration
+│   └── workflows/
+│       └── build-iso.yml      # CI/CD pipeline
+├── src/
+│   ├── __init__.py
+│   ├── builder.py             # Main ISO builder (Python)
+│   ├── firmware.py            # Firmware integration
+│   ├── config.py              # Configuration management
+│   └── performance.py         # Performance tracking
+├── docker/
+│   ├── Dockerfile             # Multi-stage build container
+│   └── entrypoint.sh          # Container entrypoint
+├── scripts/
+│   ├── build-iso.sh           # Main build orchestrator
+│   ├── download-firmware.sh   # Firmware download script
+│   ├── inject-firmware.sh     # Firmware injection script
+│   ├── build-early-microcode.sh # Early microcode builder (MCE fixes)
+│   ├── rebuild-iso.sh         # ISO rebuild from modified contents
+│   └── validate-tools.sh      # Tool validation script
+├── config/
+│   ├── preseed.cfg            # Debian preseed configuration
+│   └── firmware-sources.json  # Firmware sources definition
+├── docker-compose.yml         # Multi-arch orchestration
+├── pyproject.toml             # Python project config
+├── .flake8                    # PEP8 linting config
+├── .gitignore                 # Git ignore patterns
+└── README.md                  # Project documentation
+```
+
+## Core Technologies
+- **Base OS**: Debian 13 (Trixie) - debian:trixie-20241202-slim
+- **Target**: Proxmox VE 9.1
+- **Language**: Python 3.13.0
+- **Container Runtime**: Docker with BuildKit/buildx
+- **Orchestration**: Docker Compose v3.9
+- **CI/CD**: GitHub Actions
+- **Code Standards**: PEP8, PEP257
+- **Version Management**: All dependencies pinned to latest stable versions (see VERSIONS.md)
+
+## Build Process Overview
+1. **Environment Setup**: Docker container with Debian Trixie base (or local build)
+2. **ISO Download**: Fetch official Proxmox VE 9.1 ISO
+3. **ISO Extraction**: Extract ISO contents to workspace
+4. **Firmware Integration**:
+   - Download firmware packages (linux-firmware, firmware-misc-nonfree)
+   - Add NVIDIA proprietary drivers
+   - Add AMD GPU firmware
+   - Add Intel microcode and GPU firmware
+   - Extract from both `/lib/firmware` and `/usr/lib/firmware` paths
+5. **Early Microcode Build**: Create early cpio for CPU microcode loading (fixes MCE errors)
+6. **ISO Remastering**: Rebuild ISO with custom firmware and microcode
+7. **Multi-arch Support**: Build for multiple architectures using buildx
+8. **Artifact Generation**: Create downloadable ISO images
+
+## Build Commands
+### Docker Build (Full Pipeline)
+```bash
+./scripts/build-iso.sh all        # Complete Docker build
+./scripts/build-iso.sh build      # Build ISO only
+./scripts/build-iso.sh lint       # Run linters
+```
+
+### Local Build (No Docker Required)
+```bash
+./scripts/build-iso.sh local              # Complete local pipeline
+./scripts/build-iso.sh download-firmware  # Download firmware packages
+./scripts/build-iso.sh inject-firmware    # Inject firmware into ISO
+./scripts/build-iso.sh build-microcode    # Build early microcode
+./scripts/build-iso.sh rebuild-iso        # Rebuild ISO from contents
+```
+
+## Firmware Sources
+### Freeware Firmware
+- `firmware-linux-free` - Free firmware for Linux drivers
+- `firmware-linux-nonfree` - Non-free but redistributable firmware
+
+### Proprietary Firmware
+- **NVIDIA**: nvidia-driver, nvidia-firmware packages
+- **AMD**: amdgpu-firmware, amd-microcode
+- **Intel**: intel-microcode, i915-firmware
+
+## Docker Compose Services
+- **builder**: Main ISO build service (multi-arch)
+- **firmware-downloader**: Firmware package downloader
+- **iso-packager**: Final ISO assembly and verification
+
+## Python Modules
+
+### `src/builder.py`
+Main ISO builder class handling:
+- ISO download and extraction
+- Build orchestration
+- Multi-arch support
+- Logging and error handling
+
+### `src/firmware.py`
+Firmware integration module:
+- Firmware source management
+- Package download from Debian repositories
+- Firmware injection into ISO
+- Verification of firmware files
+
+### `src/config.py`
+Configuration management:
+- YAML/JSON config parsing
+- Environment variable handling
+- Build parameter validation
+
+## Code Standards
+
+### PEP8 Compliance
+- Maximum line length: 88 characters (Black compatible)
+- 4 spaces for indentation
+- Class names: PascalCase
+- Function/variable names: snake_case
+- Constants: UPPER_SNAKE_CASE
+
+### PEP257 Docstring Requirements
+All modules, classes, and functions must include docstrings:
+
+```python
+def download_firmware(vendor: str, version: str) -> bool:
+    """
+    Download firmware packages for specified vendor.
+
+    Args:
+        vendor: Hardware vendor name (nvidia, amd, intel)
+        version: Firmware version to download
+
+    Returns:
+        True if download successful, False otherwise
+
+    Raises:
+        FirmwareDownloadError: If download fails
+    """
+    pass
+```
+
+## Multi-Architecture Build
+
+### Supported Architectures
+- `linux/amd64` - Primary architecture
+- `linux/arm64` - ARM 64-bit support
+
+### Architecture-Specific Package Handling
+The Dockerfile uses divergent architecture flows to handle packages that differ between architectures:
+
+**Architecture-Independent Packages** (same version across all architectures):
+- python3.13, python3.13-venv, python3-pip
+- wget, curl, isolinux, squashfs-tools
+- sudo, ca-certificates, gnupg
+
+**Architecture-Specific Packages** (handled in conditional blocks):
+- **amd64**: xorriso, genisoimage, syslinux, syslinux-utils
+- **arm64**: xorriso, genisoimage (no syslinux - x86-only bootloader)
+
+**Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support. They are not available on ARM64 architecture and are only installed on amd64 builds.
+
+### BuildKit Configuration
+```yaml
+services:
+  builder:
+    image: proxmox-iso-builder:latest
+    platform: linux/amd64,linux/arm64
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+```
+
+## CI/CD Workflow
+
+### GitHub Actions Pipeline
+1. **Lint**: Check PEP8, PEP257 compliance
+2. **Build**: Multi-arch Docker image build
+3. **Test**: Validate ISO structure
+4. **Artifact Upload**: Store built ISOs
+5. **Release**: Tag and publish releases
+
+### Quality Gates
+- All Python code must pass `flake8` linting
+- All docstrings must pass `pydocstyle` validation
+- Docker builds must succeed for all platforms
+- ISOs must be bootable and verified
+
+## Environment Variables
+
+### Build Configuration
+- `PROXMOX_VERSION`: Target Proxmox version (default: 9.1)
+- `DEBIAN_RELEASE`: Debian release name (default: trixie)
+- `INCLUDE_NVIDIA`: Include NVIDIA drivers (default: true)
+- `INCLUDE_AMD`: Include AMD firmware (default: true)
+- `INCLUDE_INTEL`: Include Intel firmware (default: true)
+- `BUILD_ARCH`: Target architecture(s) (default: linux/amd64,linux/arm64)
+
+### Repository URLs
+- `PROXMOX_REPO`: Proxmox repository URL
+- `DEBIAN_REPO`: Debian package repository
+- `FIRMWARE_REPO`: Firmware repository URL
+
+## Common Tasks
+
+### Adding New Firmware
+1. Update `config/firmware-sources.json` with new firmware package
+2. Modify `src/firmware.py` to handle new vendor
+3. Update documentation
+4. Test firmware injection
+5. Verify ISO boots with new firmware
+
+### Modifying Build Process
+1. Edit build scripts in `scripts/` directory
+2. Update Python modules in `src/` as needed
+3. Ensure PEP8/PEP257 compliance
+4. Update tests
+5. Document changes in README.md
+
+### Adding New Architecture
+1. Update `docker-compose.yml` platform list
+2. Modify Dockerfile for architecture-specific steps:
+   - Add architecture detection using `TARGETARCH`
+   - Install shared packages in common block
+   - Handle arch-specific packages in conditional blocks
+   - Document package availability (e.g., syslinux is x86-only)
+3. Pin package versions for the new architecture in VERSIONS.md
+4. Test build on new architecture
+5. Update documentation
+
+## Best Practices
+
+### Version Management
+- **Always pin versions** to specific releases (not ranges like `>=`)
+- Document all version pins in VERSIONS.md (includes architecture-specific package tables and commit hashes)
+- Review and update versions monthly for security
+- Test thoroughly after any version updates
+- Use exact versions in Dockerfile (e.g., `python3.13=3.13.5-2`)
+- Pin GitHub Actions to commit hashes for security (prevents supply chain attacks):
+  ```yaml
+  uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  ```
+
+### Code Quality
+- Always run `flake8` and `pydocstyle` before committing
+- Use type hints for all function parameters and returns
+- Keep functions focused and under 50 lines
+- Use meaningful variable names
+- Add comments for complex logic
+
+### Docker Best Practices
+- Use multi-stage builds to minimize image size
+- Pin base image versions
+- Use BuildKit features for caching
+- Clean up intermediate files in same RUN layer
+- Use .dockerignore to exclude unnecessary files
+
+### Security Considerations
+- Verify firmware package checksums
+- Use official Debian/Proxmox repositories
+- Scan containers for vulnerabilities
+- Don't commit secrets or API keys
+- Use environment variables for sensitive data
+- Pin GitHub Actions to commit hashes to prevent supply chain attacks
+
+## Troubleshooting
+
+### ISO Build Failures
+- Check disk space availability
+- Verify Proxmox ISO URL is accessible
+- Ensure firmware packages are downloadable
+- Review build logs for specific errors
+
+### Multi-arch Build Issues
+- Ensure Docker buildx is installed and configured
+- Check QEMU emulation is available
+- Verify platform specifications match Docker support
+- Check for architecture-specific package availability (e.g., syslinux is x86-only)
+- Review VERSIONS.md for architecture-specific package versions
+
+### Firmware Integration Problems
+- Verify firmware package names are correct
+- Check Debian repository availability
+- Ensure firmware files are placed in correct ISO location
+- **Modern Debian packages use `/usr/lib/firmware`** - the scripts check both paths
+- Test ISO boot in appropriate hardware/VM
+
+### MCE Errors and Boot Loop Issues
+MCE (Machine Check Exception) errors indicate hardware-level CPU issues. Solutions:
+1. **Early microcode loading** - Run `build-microcode` to prepend CPU microcode to initrd
+2. **GRUB boot options added** (in Advanced Options menu):
+   - `MCE Debug (Corrected Errors Only)` - `mce=dont_log_ce`
+   - `MCE Disabled` - `mce=off` (for testing only)
+   - `Safe Mode (No ACPI)` - `noapic nolapic acpi=off`
+3. **Hardware checks**:
+   - Run memtest86+ from boot menu
+   - Check CPU temperature
+   - Update BIOS/UEFI firmware
+   - Verify RAM stability
+
+## References
+- [Proxmox VE Documentation](https://pve.proxmox.com/wiki/Main_Page)
+- [Debian Live Manual](https://live-team.pages.debian.net/live-manual/)
+- [Docker BuildKit Documentation](https://docs.docker.com/build/buildkit/)
+- [PEP 8 Style Guide](https://peps.python.org/pep-0008/)
+- [PEP 257 Docstring Conventions](https://peps.python.org/pep-0257/)
+
+## Agent Behavior Guidelines
+
+When assisting with this project:
+1. **Always** ensure code is PEP8 and PEP257 compliant
+2. **Prioritize** multi-architecture compatibility
+3. **Verify** firmware sources are legitimate and safe
+4. **Document** all changes clearly
+5. **Test** builds before suggesting changes
+6. **Consider** disk space and build time optimization
+7. **Maintain** backward compatibility
+8. **Follow** the established project structure
+9. **Use** type hints and proper error handling
+10. **Keep** Docker images lean and efficient
+
+## Version History
+- **v1.2.0**: MCE fix and local build pipeline
+  - Fixed firmware injection to check both `/lib/firmware` and `/usr/lib/firmware` paths
+  - Added early microcode loading (prepended to initrd) for MCE error fixes
+  - Added `build-early-microcode.sh` script for CPU microcode integration
+  - Added `rebuild-iso.sh` script for ISO reconstruction
+  - Added local build commands (no Docker required): `local`, `download-firmware`, `inject-firmware`, `build-microcode`, `rebuild-iso`
+  - Added MCE debug boot menu options in GRUB (mce=dont_log_ce, mce=off, safe mode)
+  - Python builder now includes 6-step process with early microcode build
+- **v1.1.0**: Architecture-specific builds and enhanced security
+  - Divergent architecture flows for Dockerfile (shared vs arch-specific packages)
+  - syslinux/syslinux-utils only installed on amd64 (x86-only bootloader)
+  - All GitHub Actions pinned to commit hashes (prevents supply chain attacks)
+  - Updated pip to 25.3, setuptools to 78.1.1, requests to 2.32.4
+  - VERSIONS.md updated with architecture-specific package tables
+- **v1.0.0**: Initial agent configuration for Proxmox 9.1 ISO pipeline
+  - All dependencies pinned to latest stable versions
+  - Python 3.13.0 with PEP8/PEP257 compliance
+  - Multi-arch Docker support (amd64, arm64)
+  - Comprehensive firmware integration (NVIDIA, AMD, Intel)
