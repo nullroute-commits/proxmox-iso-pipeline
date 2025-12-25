@@ -15,8 +15,9 @@ This GitHub Copilot agent is designed to assist with building custom Debian 13 (
 ```
 proxmox-iso-pipeline/
 ├── .github/
+│   ├── agent.md               # General agent configuration (this file)
 │   ├── agents/
-│   │   └── agent.md           # This agent configuration
+│   │   └── agent.md           # Specific agent configuration
 │   └── workflows/
 │       └── build-iso.yml      # CI/CD pipeline
 ├── src/
