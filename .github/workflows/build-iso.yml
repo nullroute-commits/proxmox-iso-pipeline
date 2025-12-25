@@ -31,11 +31,8 @@ on:
       create_release:
         description: 'Create a GitHub release'
         required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
+        default: false
+        type: boolean
 
 env:
   PROXMOX_VERSION: ${{ github.event.inputs.proxmox_version || '9.1' }}
