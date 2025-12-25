@@ -219,14 +219,15 @@ jobs:
       - name: Determine Docker image tag
         id: docker-tag
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # For tags, use the tag name
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # For manual dispatch, use the branch name or 'main' as fallback
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            # For tags, strip the leading 'v' to match semver-based Docker tags
+            tag="${GITHUB_REF_NAME#v}"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            # For manual dispatch, use the commit SHA to match the SHA-based image tag
+            echo "tag=sha-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=main" >> $GITHUB_OUTPUT
+            echo "tag=main" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create output directories
@@ -266,7 +267,7 @@ jobs:
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == true)
     permissions:
       contents: write
     
@@ -285,9 +286,9 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             # Use the actual tag name for tag-triggered releases
-            VERSION="${{ github.ref_name }}"
+            VERSION="${GITHUB_REF_NAME}"
           else
             # Generate version for push/manual triggers
             VERSION="v${{ env.PROXMOX_VERSION }}-$(date -u +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)"
