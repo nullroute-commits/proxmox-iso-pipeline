@@ -146,6 +146,16 @@ The Proxmox ISO Pipeline is a containerized build system that creates custom Pro
                            │
                            ▼
             ┌─────────────────────────┐
+            │ BOOT SETUP PHASE        │
+            │                         │
+            │ • Copy isolinux.bin     │
+            │ • Copy syslinux modules │
+            │ • Create isolinux.cfg   │
+            │ • Enable BIOS boot      │
+            └────────────┬────────────┘
+                         │
+                         ▼
+            ┌─────────────────────────┐
             │ INTEGRATION PHASE       │
             │                         │
             │ Copy firmware to        │
