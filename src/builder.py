@@ -163,6 +163,203 @@ class ProxmoxISOBuilder:
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Failed to extract ISO: {e.stderr}")
 
+    def setup_isolinux_boot(self) -> bool:
+        """
+        Setup isolinux boot files for BIOS/Legacy boot support.
+
+        Creates isolinux directory structure and copies necessary boot files
+        from system syslinux installation to enable hybrid UEFI+BIOS boot.
+
+        Returns:
+            True if isolinux setup succeeded, False otherwise
+
+        Raises:
+            RuntimeError: If ISO not extracted yet
+        """
+        with track_performance("setup_isolinux_boot", stage="boot"):
+            if self.iso_root is None:
+                raise RuntimeError("ISO not extracted yet")
+
+            isolinux_dir = self.iso_root / "isolinux"
+            
+            # Check if isolinux already exists
+            if (isolinux_dir / "isolinux.bin").exists():
+                logger.info("isolinux boot files already present")
+                return True
+
+            logger.info("Setting up isolinux for BIOS boot support...")
+
+            # Create isolinux directory (with sudo since iso_root is owned by root)
+            try:
+                subprocess.run(
+                    ["sudo", "mkdir", "-p", str(isolinux_dir)],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to create isolinux directory: {e}")
+                return False
+
+            # Source paths for isolinux files
+            isolinux_sources = [
+                Path("/usr/lib/ISOLINUX/isolinux.bin"),
+                Path("/usr/lib/syslinux/isolinux.bin"),
+            ]
+
+            # Find and copy isolinux.bin
+            isolinux_bin = None
+            for source in isolinux_sources:
+                if source.exists():
+                    isolinux_bin = source
+                    break
+
+            if not isolinux_bin:
+                logger.warning(
+                    "isolinux.bin not found in system. BIOS boot will not be available."
+                )
+                return False
+
+            # Copy isolinux.bin
+            try:
+                subprocess.run(
+                    ["sudo", "cp", str(isolinux_bin), str(isolinux_dir / "isolinux.bin")],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info(f"Copied isolinux.bin from {isolinux_bin}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to copy isolinux.bin: {e}")
+                return False
+
+            # Copy essential syslinux modules for boot menu
+            syslinux_modules_dirs = [
+                Path("/usr/lib/syslinux/modules/bios"),
+                Path("/usr/lib/syslinux/bios"),
+            ]
+
+            essential_modules = [
+                "ldlinux.c32",  # Required for isolinux
+                "libcom32.c32",  # Common library
+                "libutil.c32",  # Utility library
+                "vesamenu.c32",  # VESA menu system
+                "menu.c32",      # Simple menu system
+            ]
+
+            modules_dir = None
+            for mod_dir in syslinux_modules_dirs:
+                if mod_dir.exists():
+                    modules_dir = mod_dir
+                    break
+
+            if modules_dir:
+                for module in essential_modules:
+                    src = modules_dir / module
+                    if src.exists():
+                        try:
+                            subprocess.run(
+                                ["sudo", "cp", str(src), str(isolinux_dir / module)],
+                                check=True,
+                                capture_output=True,
+                            )
+                            logger.info(f"Copied {module}")
+                        except subprocess.CalledProcessError as e:
+                            logger.warning(f"Failed to copy {module}: {e}")
+
+            # Find kernel and initrd in the ISO
+            kernel_path = None
+            initrd_path = None
+
+            # Common locations for Proxmox/Debian kernels
+            kernel_locations = [
+                self.iso_root / "pve" / "vmlinuz",
+                self.iso_root / "boot" / "vmlinuz",
+                self.iso_root / "live" / "vmlinuz",
+            ]
+
+            initrd_locations = [
+                self.iso_root / "pve" / "initrd.img",
+                self.iso_root / "boot" / "initrd.img",
+                self.iso_root / "live" / "initrd.img",
+            ]
+
+            for loc in kernel_locations:
+                if loc.exists():
+                    kernel_path = loc.relative_to(self.iso_root)
+                    logger.info(f"Found kernel at: {kernel_path}")
+                    break
+
+            for loc in initrd_locations:
+                if loc.exists():
+                    initrd_path = loc.relative_to(self.iso_root)
+                    logger.info(f"Found initrd at: {initrd_path}")
+                    break
+
+            if not kernel_path or not initrd_path:
+                logger.warning(
+                    "Could not locate kernel/initrd. Creating basic isolinux.cfg anyway."
+                )
+                kernel_path = Path("boot/vmlinuz")
+                initrd_path = Path("boot/initrd.img")
+
+            # Create isolinux.cfg
+            isolinux_cfg = f"""default install
+prompt 0
+timeout 30
+
+label install
+  menu label ^Install Proxmox VE
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} splash=verbose
+
+label install-text
+  menu label Install Proxmox VE (^Text Mode)
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} splash=verbose console=tty0
+
+label rescue
+  menu label ^Rescue Mode
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} rescue/enable=true
+
+label memtest
+  menu label ^Memory Test
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} memtest
+"""
+
+            # Write isolinux.cfg using sudo
+            try:
+                cfg_path = isolinux_dir / "isolinux.cfg"
+                # Write to temp file first, then copy with sudo
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+                    tmp.write(isolinux_cfg)
+                    tmp_path = tmp.name
+                
+                subprocess.run(
+                    ["sudo", "cp", tmp_path, str(cfg_path)],
+                    check=True,
+                    capture_output=True,
+                )
+                Path(tmp_path).unlink()  # Clean up temp file
+                logger.info("Created isolinux.cfg")
+            except Exception as e:
+                logger.error(f"Failed to create isolinux.cfg: {e}")
+                return False
+
+            # Make files readable
+            try:
+                subprocess.run(
+                    ["sudo", "chmod", "-R", "a+r", str(isolinux_dir)],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Failed to set permissions: {e}")
+
+            logger.info("isolinux boot support configured successfully")
+            return True
+
     def download_firmware_packages(self) -> List[Path]:
         """
         Download all required firmware packages.
@@ -594,27 +791,31 @@ class ProxmoxISOBuilder:
             )
 
             # Download original ISO
-            console.print("[cyan]Step 1/6: Downloading Proxmox ISO[/cyan]")
+            console.print("[cyan]Step 1/7: Downloading Proxmox ISO[/cyan]")
             iso_path = self.download_iso(iso_url)
 
             # Extract ISO
-            console.print("[cyan]Step 2/6: Extracting ISO[/cyan]")
+            console.print("[cyan]Step 2/7: Extracting ISO[/cyan]")
             self.extract_iso(iso_path)
 
+            # Setup isolinux boot support
+            console.print("[cyan]Step 3/7: Setting up BIOS boot support[/cyan]")
+            self.setup_isolinux_boot()
+
             # Download firmware
-            console.print("[cyan]Step 3/6: Downloading firmware packages[/cyan]")
+            console.print("[cyan]Step 4/7: Downloading firmware packages[/cyan]")
             firmware_packages = self.download_firmware_packages()
 
             # Integrate firmware
-            console.print("[cyan]Step 4/6: Integrating firmware[/cyan]")
+            console.print("[cyan]Step 5/7: Integrating firmware[/cyan]")
             self.integrate_firmware(firmware_packages)
 
             # Build early microcode (critical for MCE fixes)
-            console.print("[cyan]Step 5/6: Building early microcode initramfs[/cyan]")
+            console.print("[cyan]Step 6/7: Building early microcode initramfs[/cyan]")
             self.build_early_microcode()
 
             # Rebuild ISO
-            console.print("[cyan]Step 6/6: Rebuilding ISO[/cyan]")
+            console.print("[cyan]Step 7/7: Rebuilding ISO[/cyan]")
             output_iso = self.rebuild_iso()
 
             console.print(f"[bold green]Build complete! ISO: {output_iso}[/bold green]")
