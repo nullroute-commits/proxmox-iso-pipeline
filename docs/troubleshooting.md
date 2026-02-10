@@ -70,9 +70,11 @@ done
 ```
 Failed to extract ISO: Permission denied
 sudo: unable to execute /bin/mount: Permission denied
+work/proxmox-ve_9.1.iso: Permission denied
 ```
 
-**Solution:**
+**Solution 1: Privileged Mode (for ISO mounting)**
+
 The container needs privileged mode for ISO mounting operations.
 
 ```bash
@@ -83,6 +85,18 @@ docker compose run --rm builder build
 docker run --rm --privileged \
   -v $(pwd)/output:/workspace/output \
   proxmox-iso-builder:latest build
+```
+
+**Solution 2: Volume Ownership (for file operations)**
+
+If you see permission errors when downloading or writing files, ensure the mounted directories have the correct ownership. The container runs as UID 1000 (builder user).
+
+```bash
+# Fix ownership of mounted directories
+sudo chown -R 1000:1000 output work firmware-cache
+
+# Or if you want to use your current user (less secure)
+sudo chown -R $(id -u):$(id -g) output work firmware-cache
 ```
 
 ### Issue: Not Enough Disk Space
@@ -252,8 +266,30 @@ __pycache__/
 ERROR: Multiple platforms feature is currently not supported for docker driver
 ```
 
-**Solution:**
-Set up Docker Buildx:
+**Solution 1: For Single-Platform Builds (Recommended)**
+
+If you only need to build for your current platform (e.g., linux/amd64), remove the `platforms` section from `docker-compose.yml`:
+
+```yaml
+# Before (causes error):
+builder:
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    platforms:
+      - linux/amd64
+      - linux/arm64
+
+# After (works with standard docker):
+builder:
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+```
+
+**Solution 2: For Multi-arch Builds**
+
+Set up Docker Buildx for true multi-architecture builds:
 
 ```bash
 # Create buildx builder
