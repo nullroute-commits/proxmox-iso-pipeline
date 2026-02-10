@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y \
     cpio=2.15+dfsg-2 \
     sudo=1.9.16p2-3 \
     ca-certificates=20250419 \
-    gnupg=2.4.7-21 \
+    gnupg=2.4.7-21+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install architecture-specific packages with pinned versions
