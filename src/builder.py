@@ -4,6 +4,7 @@ import logging
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -26,6 +27,32 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+# Isolinux boot menu configuration template
+ISOLINUX_CFG_TEMPLATE = """default install
+prompt 0
+timeout 30
+
+label install
+  menu label ^Install Proxmox VE
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} splash=verbose
+
+label install-text
+  menu label Install Proxmox VE (^Text Mode)
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} splash=verbose console=tty0
+
+label rescue
+  menu label ^Rescue Mode
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} rescue/enable=true
+
+label memtest
+  menu label ^Memory Test
+  kernel /{kernel_path}
+  append initrd=/{initrd_path} memtest
+"""
 
 
 class ProxmoxISOBuilder:
@@ -301,37 +328,16 @@ class ProxmoxISOBuilder:
                 kernel_path = Path("boot/vmlinuz")
                 initrd_path = Path("boot/initrd.img")
 
-            # Create isolinux.cfg
-            isolinux_cfg = f"""default install
-prompt 0
-timeout 30
-
-label install
-  menu label ^Install Proxmox VE
-  kernel /{kernel_path}
-  append initrd=/{initrd_path} splash=verbose
-
-label install-text
-  menu label Install Proxmox VE (^Text Mode)
-  kernel /{kernel_path}
-  append initrd=/{initrd_path} splash=verbose console=tty0
-
-label rescue
-  menu label ^Rescue Mode
-  kernel /{kernel_path}
-  append initrd=/{initrd_path} rescue/enable=true
-
-label memtest
-  menu label ^Memory Test
-  kernel /{kernel_path}
-  append initrd=/{initrd_path} memtest
-"""
+            # Create isolinux.cfg from template
+            isolinux_cfg = ISOLINUX_CFG_TEMPLATE.format(
+                kernel_path=kernel_path,
+                initrd_path=initrd_path
+            )
 
             # Write isolinux.cfg using sudo
             try:
                 cfg_path = isolinux_dir / "isolinux.cfg"
                 # Write to temp file first, then copy with sudo
-                import tempfile
                 with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
                     tmp.write(isolinux_cfg)
                     tmp_path = tmp.name
