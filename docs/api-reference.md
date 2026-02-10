@@ -136,6 +136,35 @@ def extract_iso(self, iso_path: Path) -> Path:
     """
 ```
 
+##### setup_isolinux_boot
+
+```python
+def setup_isolinux_boot(self) -> bool:
+    """
+    Setup isolinux boot files for BIOS/Legacy boot support.
+
+    Creates isolinux directory structure and copies necessary boot files
+    from system syslinux installation to enable hybrid UEFI+BIOS boot.
+
+    This method:
+    - Creates the isolinux directory in the ISO root
+    - Copies isolinux.bin bootloader from system
+    - Copies essential syslinux modules (ldlinux.c32, libcom32.c32, etc.)
+    - Locates kernel and initrd files in the ISO
+    - Generates isolinux.cfg boot configuration
+
+    Returns:
+        True if isolinux setup succeeded, False otherwise.
+
+    Raises:
+        RuntimeError: If ISO root is not set (extract_iso not called).
+
+    Example:
+        >>> builder.setup_isolinux_boot()
+        >>> # Enables hybrid UEFI+BIOS boot support
+    """
+```
+
 ##### download_firmware_packages
 
 ```python

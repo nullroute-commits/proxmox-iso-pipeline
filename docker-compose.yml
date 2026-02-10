@@ -4,9 +4,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
       # Remote cache is optional - only used when ghcr.io is accessible
       # The pipeline works without GitHub by building locally
       cache_from:
