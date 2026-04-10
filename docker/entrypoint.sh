@@ -3,13 +3,6 @@
 
 set -eo pipefail
 
-# Graceful shutdown handler
-shutdown_handler() {
-    echo -e "\033[0;36m[INFO]\033[0m Received shutdown signal, cleaning up..."
-    exit 0
-}
-trap shutdown_handler SIGTERM SIGINT
-
 # Function to print colored output
 print_info() {
     echo -e "\033[0;36m[INFO]\033[0m $1"

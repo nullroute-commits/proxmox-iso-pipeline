@@ -305,7 +305,9 @@ class ProxmoxISOBuilder:
         Prepend early microcode cpio to initrd.
 
         Uses only the specific sudo-allowed binaries (/bin/cat, /bin/mv,
-        /usr/bin/tee) to avoid requiring /bin/sh in sudoers.
+        /usr/bin/tee) to avoid requiring /bin/sh in sudoers.  Data is
+        streamed between the two processes via a pipe so the full initrd
+        is never buffered in Python memory.
 
         Args:
             early_cpio: Path to early microcode cpio archive
@@ -323,19 +325,35 @@ class ProxmoxISOBuilder:
                 capture_output=True,
             )
             # Combine early_ucode + original_initrd using allowed commands.
-            # Read both files with sudo cat and write via sudo tee, which
-            # avoids the need for sudo sh -c (not in sudoers).
-            cat_result = subprocess.run(
+            # Stream data through a pipe (cat → tee) so the full initrd
+            # never sits in Python memory — avoids OOM on large images.
+            cat_proc = subprocess.Popen(
                 ["sudo", "cat", str(early_cpio), str(initrd_orig)],
-                capture_output=True,
-                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
-            subprocess.run(
+            tee_proc = subprocess.Popen(
                 ["sudo", "tee", str(initrd)],
-                input=cat_result.stdout,
+                stdin=cat_proc.stdout,
                 stdout=subprocess.DEVNULL,
-                check=True,
+                stderr=subprocess.PIPE,
             )
+            # Allow cat_proc to receive SIGPIPE if tee exits early
+            if cat_proc.stdout:
+                cat_proc.stdout.close()
+            tee_stderr = tee_proc.communicate()[1]
+            cat_proc.wait()
+
+            if cat_proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    cat_proc.returncode,
+                    cat_proc.args,
+                    stderr=cat_proc.stderr.read() if cat_proc.stderr else b"",
+                )
+            if tee_proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    tee_proc.returncode, tee_proc.args, stderr=tee_stderr
+                )
         except subprocess.CalledProcessError:
             # Attempt to restore the original initrd from the backup
             try:
