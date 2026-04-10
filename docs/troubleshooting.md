@@ -40,7 +40,7 @@ df -h . | tail -1 | awk '{print $4 " available"}'
 
 # Check Python (if running locally)
 echo -n "Python: "
-python3 --version 2>/dev/null | grep -q "3.13" && python3 --version || echo "3.13.x NOT FOUND"
+python3 --version 2>/dev/null | grep -qE "3\.(1[1-9]|[2-9][0-9])" && python3 --version || echo "3.11+ NOT FOUND"
 
 # Check network
 echo -n "Network (Proxmox): "
@@ -73,14 +73,15 @@ sudo: unable to execute /bin/mount: Permission denied
 ```
 
 **Solution:**
-The container needs privileged mode for ISO mounting operations.
+The container needs specific capabilities for ISO mounting operations.
 
 ```bash
-# Using Docker Compose (already configured)
+# Using Docker Compose (already configured with cap_add)
 docker compose run --rm builder build
 
-# Using Docker directly
-docker run --rm --privileged \
+# Using Docker directly (with specific capabilities instead of --privileged)
+docker run --rm --cap-add SYS_ADMIN --cap-add MKNOD \
+  --device /dev/loop-control \
   -v $(pwd)/output:/workspace/output \
   proxmox-iso-builder:latest build
 ```

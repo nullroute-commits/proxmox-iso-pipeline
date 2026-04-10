@@ -60,7 +60,7 @@ All environment variables and their descriptions:
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `BUILD_ARCH` | string | `linux/amd64,linux/arm64` | Comma-separated architectures |
+| `BUILD_ARCH` | string | `linux/amd64,linux/arm64,linux/loong64` | Comma-separated architectures |
 
 ### Directory Paths
 
@@ -89,7 +89,7 @@ export DEBIAN_RELEASE=trixie
 export INCLUDE_NVIDIA=true
 export INCLUDE_AMD=true
 export INCLUDE_INTEL=true
-export BUILD_ARCH=linux/amd64,linux/arm64
+export BUILD_ARCH=linux/amd64,linux/arm64,linux/loong64
 export OUTPUT_DIR=./output
 export WORK_DIR=./work
 export FIRMWARE_CACHE=./firmware-cache
@@ -123,6 +123,7 @@ include_intel: true
 build_arch:
   - linux/amd64
   - linux/arm64
+  - linux/loong64
 
 # Directory paths (relative or absolute)
 output_dir: ./output
@@ -143,7 +144,8 @@ Create `config.json`:
   "include_intel": true,
   "build_arch": [
     "linux/amd64",
-    "linux/arm64"
+    "linux/arm64",
+    "linux/loong64"
   ],
   "output_dir": "./output",
   "work_dir": "./work",
@@ -353,7 +355,16 @@ services:
       platforms:
         - linux/amd64
         - linux/arm64
-    privileged: true  # Required for ISO mounting
+        - linux/loong64
+    init: true  # Proper PID 1 handling
+    # Use specific capabilities instead of full privileged mode
+    cap_add:
+      - SYS_ADMIN  # Required for mount/umount ISO operations
+      - MKNOD      # Required for loop device creation
+    devices:
+      - /dev/loop-control:/dev/loop-control
+    security_opt:
+      - apparmor:unconfined
     volumes:
       - ./output:/workspace/output
       - ./work:/workspace/work
@@ -366,7 +377,7 @@ services:
       - INCLUDE_NVIDIA=${INCLUDE_NVIDIA:-true}
       - INCLUDE_AMD=${INCLUDE_AMD:-true}
       - INCLUDE_INTEL=${INCLUDE_INTEL:-true}
-      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64}
+      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64,linux/loong64}
 ```
 
 ### Volume Mounts
@@ -407,7 +418,7 @@ services:
 | `include_nvidia` | `true` |
 | `include_amd` | `true` |
 | `include_intel` | `true` |
-| `build_arch` | `["linux/amd64", "linux/arm64"]` |
+| `build_arch` | `["linux/amd64", "linux/arm64", "linux/loong64"]` |
 | `output_dir` | `./output` |
 | `work_dir` | `./work` |
 | `firmware_cache` | `./firmware-cache` |

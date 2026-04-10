@@ -49,8 +49,10 @@ Best for: Air-gapped environments, standardized deployments
 # Pull pre-built image (when using GitHub Container Registry)
 docker pull ghcr.io/nullroute-commits/proxmox-iso-pipeline:main
 
-# Run directly
-docker run --rm --privileged \
+# Run directly (with specific capabilities instead of --privileged)
+docker run --rm --init \
+  --cap-add SYS_ADMIN --cap-add MKNOD \
+  --device /dev/loop-control \
   -v $(pwd)/output:/workspace/output \
   -v $(pwd)/work:/workspace/work \
   -v $(pwd)/firmware-cache:/workspace/firmware-cache \
@@ -118,11 +120,13 @@ on:
 
 | Job | Purpose | Duration |
 |-----|---------|----------|
-| `lint` | Code quality checks | ~2 min |
-| `build-docker` | Multi-arch image build | ~10 min |
-| `test` | Pytest execution | ~3 min |
+| `lint` | Code quality checks (PEP8, PEP257, Black, mypy) | ~2 min |
+| `lint-docker` | Dockerfile (Hadolint) and shell script (ShellCheck) linting | ~1 min |
+| `build-docker` | Multi-arch image build (amd64, arm64) | ~10 min |
+| `test` | Pytest execution (66 tests, ~60% coverage) | ~3 min |
 | `security-scan` | Trivy vulnerability scan | ~5 min |
-| `release` | Release notes generation | ~1 min |
+| `build-iso` | Build custom Proxmox ISO | ~30 min |
+| `release` | Release notes and artifact publication | ~1 min |
 
 ### GitLab CI Integration
 
@@ -141,7 +145,7 @@ variables:
 
 lint:
   stage: lint
-  image: python:3.13.0-slim
+  image: python:3.13-slim
   script:
     - pip install flake8==7.1.1 pydocstyle==6.3.0 black==24.10.0
     - flake8 src/
@@ -223,7 +227,7 @@ INCLUDE_AMD=true
 INCLUDE_INTEL=true
 
 # Build Configuration
-BUILD_ARCH=linux/amd64,linux/arm64
+BUILD_ARCH=linux/amd64,linux/arm64,linux/loong64
 
 # Directory Paths (for volume mounting)
 OUTPUT_DIR=/data/iso-output
@@ -389,19 +393,20 @@ secrets:
 
 ### Privileged Mode
 
-The builder requires `--privileged` for ISO mounting. Mitigate risks:
+The builder requires specific capabilities for ISO mounting. The compose file already uses least-privilege `cap_add` instead of full `--privileged`:
 
 ```yaml
-# More restrictive capability set
+# Least-privilege capability set (already configured in docker-compose.yml)
 services:
   builder:
+    init: true
     cap_add:
-      - SYS_ADMIN
-      - MKNOD
-    cap_drop:
-      - ALL
+      - SYS_ADMIN  # Required for mount/umount ISO operations
+      - MKNOD      # Required for loop device creation
+    devices:
+      - /dev/loop-control:/dev/loop-control
     security_opt:
-      - apparmor:docker-default
+      - apparmor:unconfined  # Required for mount operations
 ```
 
 ## Scaling and Performance
@@ -413,6 +418,10 @@ Run multiple architecture builds in parallel:
 ```bash
 # Build amd64 and arm64 simultaneously
 docker buildx build --platform linux/amd64,linux/arm64 \
+  -f docker/Dockerfile -t proxmox-iso-builder:latest .
+
+# Build all three architectures (loong64 requires compatible base image)
+docker buildx build --platform linux/amd64,linux/arm64,linux/loong64 \
   -f docker/Dockerfile -t proxmox-iso-builder:latest .
 ```
 

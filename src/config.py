@@ -26,7 +26,7 @@ class BuildConfig:
     def __post_init__(self) -> None:
         """Initialize default values and validate configuration."""
         if self.build_arch is None:
-            self.build_arch = ["linux/amd64", "linux/arm64"]
+            self.build_arch = ["linux/amd64", "linux/arm64", "linux/loong64"]
 
         # Create directories if they don't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)

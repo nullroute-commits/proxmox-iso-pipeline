@@ -20,7 +20,7 @@ class TestBuildConfig:
         assert config.include_nvidia is True
         assert config.include_amd is True
         assert config.include_intel is True
-        assert config.build_arch == ["linux/amd64", "linux/arm64"]
+        assert config.build_arch == ["linux/amd64", "linux/arm64", "linux/loong64"]
 
     def test_custom_values(self, tmp_path):
         """Test BuildConfig with custom values."""

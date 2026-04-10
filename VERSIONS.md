@@ -6,7 +6,7 @@ This document tracks all pinned versions used in the Proxmox ISO Pipeline projec
 2025-12-25
 
 ## Python Runtime
-- **Python**: 3.13.0
+- **Python**: 3.11+ (CI and Docker target 3.13; `requires-python = ">=3.11"`)
   - Specified in: `pyproject.toml`, `Dockerfile`, GitHub Actions
 
 ## Python Dependencies
@@ -74,9 +74,17 @@ All versions are pinned for reproducibility. Some packages have architecture-spe
 | genisoimage | 9:1.1.11-4 | ISO creation tool |
 | squashfs-tools | 1:4.6.1-1+b1 | SquashFS filesystem tools |
 
+#### Architecture-Specific Packages (loong64) — Experimental
+| Package | Version | Purpose |
+|---------|---------|---------|
+| xorriso | unpinned | ISO image creator |
+| genisoimage | unpinned | ISO creation tool |
+| squashfs-tools | unpinned | SquashFS filesystem tools |
+
 **Note**: `syslinux` and `syslinux-utils` are x86-specific packages required for legacy BIOS boot support.
-They are not available on ARM64 architecture and are only installed on amd64 builds.
+They are not available on ARM64 or LoongArch64 architectures and are only installed on amd64 builds.
 `squashfs-tools` has different binary rebuild versions between amd64 and arm64.
+LoongArch64 (loong64) support is experimental — packages are not version-pinned pending official Debian support in Debian 14.
 
 ## GitHub Actions
 

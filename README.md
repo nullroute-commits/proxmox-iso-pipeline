@@ -1,7 +1,7 @@
 # Proxmox ISO Pipeline
 
 [![Build Status](https://github.com/nullroute-commits/proxmox-iso-pipeline/workflows/Build%20Proxmox%20ISO/badge.svg)](https://github.com/nullroute-commits/proxmox-iso-pipeline/actions)
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PEP8](https://img.shields.io/badge/code%20style-pep8-orange.svg)](https://www.python.org/dev/peps/pep-0008/)
 [![PEP257](https://img.shields.io/badge/docstring-pep257-green.svg)](https://www.python.org/dev/peps/pep-0257/)
 [![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)](https://www.docker.com/)
@@ -10,10 +10,10 @@ A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trix
 
 ## Features
 
-- 🐍 **Python 3.13.0** - Latest Python with full PEP8 and PEP257 compliance
+- 🐍 **Python 3.11+** - Supports Python 3.11 through 3.13 with full PEP8 and PEP257 compliance (Docker/CI target 3.13)
 - 📌 **Pinned Versions** - All dependencies pinned to latest stable versions (see [VERSIONS.md](VERSIONS.md))
 - 🐳 **Docker Compose** - Multi-container orchestration for streamlined builds
-- 🏗️ **Multi-Architecture** - Support for `linux/amd64` and `linux/arm64`
+- 🏗️ **Multi-Architecture** - Support for `linux/amd64`, `linux/arm64`, and `linux/loong64` (experimental)
 - 📀 **Custom ISO Builder** - Automated Proxmox VE installer customization
 - 🔐 **Hybrid Boot Support**:
   - ✅ UEFI/EFI boot with Secure Boot compatibility
@@ -36,7 +36,7 @@ A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trix
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  ┌──────────────┐      ┌──────────────┐            │
-│  │   Python 3.13 │      │    Docker    │            │
+│  │  Python 3.11+ │      │    Docker    │            │
 │  │   Builder     │─────▶│   Container  │            │
 │  └──────────────┘      └──────────────┘            │
 │         │                      │                    │
@@ -49,7 +49,7 @@ A comprehensive, multi-architecture pipeline for building custom Debian 13 (Trix
 │         ▼                                           │
 │  ┌──────────────────────────────────┐              │
 │  │   Multi-Arch ISO Builder         │              │
-│  │   (amd64, arm64)                 │              │
+│  │   (amd64, arm64, loong64)         │              │
 │  └──────────────────────────────────┘              │
 │         │                                           │
 │         ▼                                           │
@@ -87,9 +87,9 @@ chmod +x scripts/build-iso.sh
 ### Using Python Directly
 
 ```bash
-# Install Python 3.13
+# Install Python 3.11+ (3.13 recommended)
 # Create virtual environment
-python3.13 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
@@ -117,7 +117,7 @@ export INCLUDE_AMD=true
 export INCLUDE_INTEL=true
 
 # Build architecture
-export BUILD_ARCH=linux/amd64,linux/arm64
+export BUILD_ARCH=linux/amd64,linux/arm64,linux/loong64
 
 # Output directories
 export OUTPUT_DIR=./output
@@ -138,6 +138,7 @@ include_intel: true
 build_arch:
   - linux/amd64
   - linux/arm64
+  - linux/loong64
 output_dir: ./output
 work_dir: ./work
 firmware_cache: ./firmware-cache
@@ -176,6 +177,12 @@ proxmox-iso-pipeline/
 ├── config/
 │   ├── preseed.cfg               # Debian preseed configuration
 │   └── firmware-sources.json     # Firmware package definitions
+├── tests/
+│   ├── __init__.py               # Test package initialization
+│   ├── test_builder.py           # Builder module tests
+│   ├── test_config.py            # Config module tests
+│   ├── test_firmware.py          # Firmware module tests
+│   └── test_performance.py       # Performance module tests
 ├── docker-compose.yml            # Multi-service orchestration
 ├── pyproject.toml                # Python project configuration
 ├── requirements.txt              # Pinned Python dependencies
@@ -230,6 +237,9 @@ docker buildx build --platform linux/amd64 -f docker/Dockerfile .
 
 # Build for multiple architectures
 docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile .
+
+# Build with loong64 (experimental, requires compatible base image)
+docker buildx build --platform linux/amd64,linux/arm64,linux/loong64 -f docker/Dockerfile .
 ```
 
 ## Development
@@ -242,7 +252,7 @@ git clone https://github.com/nullroute-commits/proxmox-iso-pipeline.git
 cd proxmox-iso-pipeline
 
 # Create virtual environment
-python3.13 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 
 # Install in development mode
@@ -325,10 +335,11 @@ To use the agent, ensure GitHub Copilot is enabled in your IDE and reference the
 The GitHub Actions workflow (`.github/workflows/build-iso.yml`) provides:
 
 1. **Linting**: PEP8, PEP257, Black, mypy checks
-2. **Multi-arch Build**: Docker image for amd64 and arm64
-3. **Testing**: Pytest execution with coverage
-4. **Security Scanning**: Trivy vulnerability scanning
-5. **Release**: Automated release creation on main branch
+2. **Dockerfile & Shell Lint**: Hadolint, ShellCheck
+3. **Multi-arch Build**: Docker image for amd64 and arm64 (loong64 when base image available)
+4. **Testing**: Pytest execution with coverage (66 tests, ~60% coverage)
+5. **Security Scanning**: Trivy vulnerability scanning
+6. **Release**: Automated release creation on main branch
 
 ### Triggering Builds
 
@@ -405,10 +416,12 @@ The build process automatically:
 
 ### Build Fails with "Permission Denied"
 
-The container needs privileged mode for ISO mounting:
+The container needs specific capabilities for ISO mounting:
 ```bash
-docker compose run --rm --privileged builder build
+docker compose run --rm builder build
 ```
+
+The compose file already includes `cap_add: SYS_ADMIN, MKNOD` which is required for mount operations.
 
 ### Firmware Download Fails
 

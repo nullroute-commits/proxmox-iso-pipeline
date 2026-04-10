@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Proxmox ISO builder
-# Supports multiple architectures: amd64, arm64
+# Supports multiple architectures: amd64, arm64, loong64 (experimental)
 # All package versions are pinned for reproducibility
 
 # Stage 1: Base build environment
@@ -59,6 +59,15 @@ RUN apt-get update && \
             xorriso=1.5.6-1.2+b1 \
             genisoimage=9:1.1.11-4 \
             squashfs-tools=1:4.6.1-1+b1; \
+    elif [ "$TARGETARCH" = "loong64" ]; then \
+        # loong64 (LoongArch64) packages
+        # Note: syslinux is not available on loong64 (x86-only bootloader)
+        # Note: loong64 support is experimental — requires unofficial
+        # Debian Trixie base images (official support begins in Debian 14)
+        apt-get install -y --no-install-recommends \
+            xorriso \
+            genisoimage \
+            squashfs-tools; \
     fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -105,7 +114,7 @@ ARG IMAGE_VERSION=1.0.0
 ARG PYTHON_VERSION=3.13.5
 ARG PROXMOX_VERSION=9.1
 ARG DEBIAN_RELEASE=trixie
-ARG ARCHITECTURES=amd64,arm64
+ARG ARCHITECTURES=amd64,arm64,loong64
 # BASE_IMAGE must be redeclared in this stage to be available for labels
 ARG BASE_IMAGE
 

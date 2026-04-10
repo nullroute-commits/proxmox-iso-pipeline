@@ -52,7 +52,7 @@ The Proxmox ISO Pipeline is a containerized build system that creates custom Pro
 
 1. **Modularity**: Separate concerns into distinct modules
 2. **Reproducibility**: Pinned versions for all dependencies
-3. **Multi-Architecture**: Support for amd64 and arm64
+3. **Multi-Architecture**: Support for amd64, arm64, and loong64 (experimental)
 4. **Containerization**: Docker-based isolated builds
 5. **Idempotency**: Same inputs produce same outputs
 
@@ -401,16 +401,17 @@ Global Functions:
 │                  Multi-Architecture Build                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────────┐        ┌──────────────────┐              │
-│  │   linux/amd64    │        │   linux/arm64    │              │
-│  │                  │        │                  │              │
-│  │ + syslinux       │        │ - syslinux (N/A) │              │
-│  │ + isolinux       │        │ + isolinux       │              │
-│  │ + squashfs-tools │        │ + squashfs-tools │              │
-│  │   (1:4.6.1-1)    │        │   (1:4.6.1-1+b1) │              │
-│  └──────────────────┘        └──────────────────┘              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
+│  │   linux/amd64    │  │   linux/arm64    │  │ linux/loong64 │  │
+│  │                  │  │                  │  │ (experimental)│  │
+│  │ + syslinux       │  │ - syslinux (N/A) │  │ - syslinux   │  │
+│  │ + isolinux       │  │ + isolinux       │  │ + xorriso    │  │
+│  │ + squashfs-tools │  │ + squashfs-tools │  │ + squashfs   │  │
+│  │   (1:4.6.1-1)    │  │   (1:4.6.1-1+b1) │  │   (unpinned)  │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────┘  │
 │                                                                  │
-│  Note: syslinux is x86-only; arm64 builds are UEFI-only        │
+│  Note: syslinux is x86-only; arm64 and loong64 are UEFI-only   │
+│  Note: loong64 requires unofficial base image (Debian 14+)      │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -426,40 +427,42 @@ Global Functions:
 │                                                                  │
 │   Trigger: push/PR to main/develop                              │
 │                      │                                           │
-│                      ▼                                           │
-│           ┌─────────────────┐                                   │
-│           │      lint       │                                   │
-│           │  • flake8       │                                   │
-│           │  • pydocstyle   │                                   │
-│           │  • black        │                                   │
-│           │  • mypy         │                                   │
-│           └────────┬────────┘                                   │
-│                    │                                             │
-│        ┌───────────┴───────────┐                                │
-│        ▼                       ▼                                │
-│ ┌──────────────┐      ┌──────────────┐                         │
-│ │ build-docker │      │     test     │                         │
-│ │              │      │              │                         │
-│ │ • buildx     │      │ • pytest     │                         │
-│ │ • multi-arch │      │ • validate   │                         │
-│ │ • push ghcr  │      │   configs    │                         │
-│ └──────┬───────┘      └──────────────┘                         │
+│        ┌─────────────┴─────────────┐                            │
+│        ▼                           ▼                            │
+│ ┌──────────────┐          ┌──────────────┐                     │
+│ │      lint    │          │ lint-docker  │                     │
+│ │  • flake8    │          │ • Hadolint   │                     │
+│ │  • pydocstyle│          │ • ShellCheck │                     │
+│ │  • black     │          └──────────────┘                     │
+│ │  • mypy      │                                               │
+│ └────────┬─────┘                                               │
+│          │                                                      │
+│  ┌───────┴───────────┐                                         │
+│  ▼                   ▼                                         │
+│ ┌──────────────┐  ┌──────────────┐                             │
+│ │ build-docker │  │     test     │                             │
+│ │              │  │              │                             │
+│ │ • buildx     │  │ • pytest     │                             │
+│ │ • multi-arch │  │ • 66 tests   │                             │
+│ │ • push ghcr  │  │ • ~60% cov   │                             │
+│ └──────┬───────┘  └──────────────┘                             │
 │        │                                                        │
-│        ▼                                                        │
-│ ┌──────────────┐                                               │
-│ │security-scan │                                               │
-│ │              │                                               │
-│ │ • Trivy      │                                               │
-│ │ • SARIF      │                                               │
-│ └──────┬───────┘                                               │
-│        │                                                        │
-│        ▼                                                        │
-│ ┌──────────────┐                                               │
-│ │   release    │ (main branch only)                            │
-│ │              │                                               │
-│ │ • Notes      │                                               │
-│ │ • Artifacts  │                                               │
-│ └──────────────┘                                               │
+│  ┌─────┴──────┐                                                │
+│  ▼            ▼                                                │
+│ ┌────────────┐  ┌──────────────┐                               │
+│ │security    │  │  build-iso   │ (main/tags/dispatch)          │
+│ │  -scan     │  │              │                               │
+│ │ • Trivy    │  │ • Docker run │                               │
+│ │ • SARIF    │  │ • SHA256SUMS │                               │
+│ └────────────┘  └──────┬───────┘                               │
+│                        │                                        │
+│                        ▼                                        │
+│                 ┌──────────────┐                                │
+│                 │   release    │ (main/tags)                    │
+│                 │              │                                │
+│                 │ • Notes      │                                │
+│                 │ • Artifacts  │                                │
+│                 └──────────────┘                                │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```

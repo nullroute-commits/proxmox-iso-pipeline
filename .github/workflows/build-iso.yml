@@ -97,14 +97,14 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Lint Dockerfile with Hadolint
-        uses: hadolint/hadolint-action@54c9adb3e059e6edb5c6acd8418b071aecbdb2f8 # v3.1.0
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
           dockerfile: docker/Dockerfile
           # DL3008: pin versions (already done), DL3003: cd in RUN
           ignore: DL3003
 
       - name: Lint shell scripts with ShellCheck
-        uses: ludeeus/action-shellcheck@00cae50e01edb5ecd1758373c32980c35dc1b994 # 2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           scandir: './scripts'
           additional_files: 'docker/entrypoint.sh'
@@ -153,6 +153,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          # linux/loong64 can be added once official Debian Trixie loong64 base images are available
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -349,7 +350,7 @@ jobs:
 
           ### Features
           - Based on Debian ${{ env.DEBIAN_RELEASE }}
-          - Multi-architecture support (amd64, arm64)
+          - Multi-architecture support (amd64, arm64, loong64 experimental)
           - Comprehensive firmware support:
             - NVIDIA: ${{ env.INCLUDE_NVIDIA }}
             - AMD: ${{ env.INCLUDE_AMD }}

@@ -2,7 +2,7 @@
 
 > **Documentation Version:** 1.0.0  
 > **Audience:** Contributors, Developers  
-> **Prerequisites:** Python 3.13, Git, Docker
+> **Prerequisites:** Python 3.11+, Git, Docker
 
 This guide covers setting up a development environment, code standards, testing, and contribution guidelines.
 
@@ -21,7 +21,7 @@ This guide covers setting up a development environment, code standards, testing,
 
 | Tool | Version | Installation |
 |------|---------|--------------|
-| Python | 3.13.0 | [python.org](https://www.python.org/downloads/) |
+| Python | 3.11+ (3.13 recommended) | [python.org](https://www.python.org/downloads/) |
 | Git | Latest | [git-scm.com](https://git-scm.com/) |
 | Docker | 20.10+ | [docker.com](https://www.docker.com/) |
 | Docker Compose | V2+ | Included with Docker Desktop |
@@ -34,7 +34,7 @@ git clone https://github.com/nullroute-commits/proxmox-iso-pipeline.git
 cd proxmox-iso-pipeline
 
 # 2. Create and activate virtual environment
-python3.13 -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # 3. Install in development mode with dev dependencies
@@ -205,17 +205,14 @@ docker compose run --rm linter
 
 ### Test Structure
 
-> **Note:** The test infrastructure is planned but not yet implemented. 
-> The structure below shows the intended test organization.
-
 ```
 proxmox-iso-pipeline/
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py          # Shared fixtures
-│   ├── test_builder.py      # Builder module tests
-│   ├── test_config.py       # Config module tests
-│   └── test_firmware.py     # Firmware module tests
+│   ├── test_builder.py      # Builder module tests (19 tests)
+│   ├── test_config.py       # Config module tests (16 tests)
+│   ├── test_firmware.py     # Firmware module tests (12 tests)
+│   └── test_performance.py  # Performance module tests (15 tests)
 ```
 
 ### Writing Tests
