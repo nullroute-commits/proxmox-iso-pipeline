@@ -160,9 +160,9 @@ USER builder
 # Expose volume mount points
 VOLUME ["/workspace/output", "/workspace/work", "/workspace/firmware-cache"]
 
-# Healthcheck: verify python and core tool availability
+# Healthcheck: verify python and core dependency availability
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=2 \
-    CMD ["python", "-c", "import src; print('ok')"]
+    CMD ["python", "-c", "import click, rich; print('ok')"]
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

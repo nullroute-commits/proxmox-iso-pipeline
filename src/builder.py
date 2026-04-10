@@ -84,7 +84,6 @@ class ProxmoxISOBuilder:
                 subprocess.run(
                     [
                         "wget",
-                        "--ca-certificate=/etc/ssl/certs/ca-certificates.crt",
                         "-O",
                         str(iso_path),
                         url,

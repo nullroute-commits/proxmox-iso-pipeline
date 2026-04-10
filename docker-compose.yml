@@ -13,8 +13,8 @@ services:
     init: true  # Proper PID 1 handling and zombie process reaping
     # Use specific capabilities instead of full privileged mode
     cap_add:
-      - SYS_ADMIN     # Required for mount/umount ISO operations
-      - MKNOD          # Required for loop device creation
+      - SYS_ADMIN  # Required for mount/umount ISO operations
+      - MKNOD      # Required for loop device creation
     devices:
       - /dev/loop-control:/dev/loop-control  # Loop device for ISO mounting
     security_opt:
