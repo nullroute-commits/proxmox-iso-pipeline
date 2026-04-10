@@ -381,8 +381,8 @@ jobs:
           ### Recent Commits
           EOF
           git log --oneline -10 >> release_notes.md
-          # Remove leading whitespace from heredoc
-          sed -i 's/^[[:space:]]*//' release_notes.md
+          # Strip exactly the 10-space yaml indentation, preserving deeper indentation
+          sed -i 's/^          //' release_notes.md
 
       - name: List release assets
         run: |
