@@ -188,9 +188,7 @@ jobs:
 
       - name: Run tests
         run: |
-          # Tests would go here
-          echo "No tests defined yet"
-          # pytest tests/ -v --cov=src --cov-report=xml
+          pytest tests/ -v --cov=src --cov-report=term-missing
 
       - name: Validate configuration files
         run: |
