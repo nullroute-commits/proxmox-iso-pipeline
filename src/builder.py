@@ -342,15 +342,17 @@ class ProxmoxISOBuilder:
             if cat_proc.stdout:
                 cat_proc.stdout.close()
             tee_stderr = tee_proc.communicate()[1]
+            # Drain cat's stderr before wait() to avoid pipe deadlock
+            cat_stderr = cat_proc.stderr.read() if cat_proc.stderr else b""
             cat_proc.wait()
 
             if cat_proc.returncode != 0:
                 raise subprocess.CalledProcessError(
                     cat_proc.returncode,
                     cat_proc.args,
-                    stderr=cat_proc.stderr.read() if cat_proc.stderr else b"",
+                    stderr=cat_stderr,
                 )
-            if tee_proc.returncode != 0:
+            if tee_proc.returncode is not None and tee_proc.returncode != 0:
                 raise subprocess.CalledProcessError(
                     tee_proc.returncode, tee_proc.args, stderr=tee_stderr
                 )
