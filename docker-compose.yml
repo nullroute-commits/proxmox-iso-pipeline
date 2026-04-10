@@ -44,7 +44,7 @@ services:
       - ./config:/workspace/config:ro
     environment:
       - DEBIAN_RELEASE=${DEBIAN_RELEASE:-trixie}
-    command: python -c "from src.firmware import FirmwareManager; import pathlib; fm = FirmwareManager(pathlib.Path('/workspace/firmware-cache'), 'trixie'); print('Firmware manager initialized')"
+    command: python -c "from src.firmware import FirmwareManager; import pathlib; fm = FirmwareManager(pathlib.Path('/workspace/firmware-cache'), 'trixie'); fm.download_firmware('freeware'); print('Firmware download complete')"
     depends_on:
       - builder
     networks:

@@ -290,18 +290,22 @@ class ProxmoxISOBuilder:
             capture_output=True,
             check=True,
         )
-        subprocess.run(
-            ["cpio", "-o", "-H", "newc", "-0"],
-            input=result.stdout,
-            cwd=temp_path,
-            stdout=cpio_path.open("wb"),
-            check=True,
-        )
+        with cpio_path.open("wb") as cpio_out:
+            subprocess.run(
+                ["cpio", "-o", "-H", "newc", "-0"],
+                input=result.stdout,
+                cwd=temp_path,
+                stdout=cpio_out,
+                check=True,
+            )
         logger.info(f"Created early microcode cpio: {cpio_path.stat().st_size} bytes")
 
     def _prepend_microcode_to_initrd(self, early_cpio: Path, initrd: Path) -> None:
         """
         Prepend early microcode cpio to initrd.
+
+        Uses only the specific sudo-allowed binaries (/bin/cat, /bin/mv,
+        /usr/bin/tee) to avoid requiring /bin/sh in sudoers.
 
         Args:
             early_cpio: Path to early microcode cpio archive
@@ -311,19 +315,26 @@ class ProxmoxISOBuilder:
             return
 
         initrd_orig = initrd.with_suffix(".img.orig")
-        # Backup original initrd using sudo (may be root-owned)
-        cat_cmd = f"cat {early_cpio} {initrd_orig} > {initrd}"
         try:
+            # Backup original initrd (sudo mv is in sudoers)
             subprocess.run(
                 ["sudo", "mv", str(initrd), str(initrd_orig)],
                 check=True,
                 capture_output=True,
             )
-            # Combine: early_ucode + original_initrd
-            subprocess.run(
-                ["sudo", "sh", "-c", cat_cmd],
-                check=True,
+            # Combine early_ucode + original_initrd using allowed commands.
+            # Read both files with sudo cat and write via sudo tee, which
+            # avoids the need for sudo sh -c (not in sudoers).
+            cat_result = subprocess.run(
+                ["sudo", "cat", str(early_cpio), str(initrd_orig)],
                 capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["sudo", "tee", str(initrd)],
+                input=cat_result.stdout,
+                stdout=subprocess.DEVNULL,
+                check=True,
             )
         except subprocess.CalledProcessError:
             # Attempt to restore the original initrd from the backup
