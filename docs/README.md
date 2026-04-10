@@ -51,11 +51,12 @@ This documentation is pinned to version **1.0.0** of the Proxmox ISO Pipeline. F
 
 | Component | Supported Version |
 |-----------|------------------|
-| Python | 3.13.0 |
+| Python | 3.11+ (CI targets 3.13) |
 | Proxmox VE | 9.1 |
 | Debian | Trixie (13) |
 | Docker | 20.10+ |
 | Docker Compose | V2+ |
+| Architectures | amd64, arm64, loong64 (experimental) |
 
 ## Documentation Standards
 

@@ -78,10 +78,16 @@ class ProxmoxISOBuilder:
             logger.info(f"Downloading Proxmox ISO from: {url}")
 
             try:
-                # Use wget for downloading with certificate verification disabled
-                # (some enterprise mirrors have certificate issues)
+                # Use wget with certificate verification enabled for security
+                # The ca-certificates package in the Docker image provides
+                # the trust store needed for HTTPS connections
                 subprocess.run(
-                    ["wget", "--no-check-certificate", "-O", str(iso_path), url],
+                    [
+                        "wget",
+                        "-O",
+                        str(iso_path),
+                        url,
+                    ],
                     check=True,
                     capture_output=True,
                 )
@@ -284,18 +290,24 @@ class ProxmoxISOBuilder:
             capture_output=True,
             check=True,
         )
-        subprocess.run(
-            ["cpio", "-o", "-H", "newc", "-0"],
-            input=result.stdout,
-            cwd=temp_path,
-            stdout=cpio_path.open("wb"),
-            check=True,
-        )
+        with cpio_path.open("wb") as cpio_out:
+            subprocess.run(
+                ["cpio", "-o", "-H", "newc", "-0"],
+                input=result.stdout,
+                cwd=temp_path,
+                stdout=cpio_out,
+                check=True,
+            )
         logger.info(f"Created early microcode cpio: {cpio_path.stat().st_size} bytes")
 
     def _prepend_microcode_to_initrd(self, early_cpio: Path, initrd: Path) -> None:
         """
         Prepend early microcode cpio to initrd.
+
+        Uses only the specific sudo-allowed binaries (/bin/cat, /bin/mv,
+        /usr/bin/tee) to avoid requiring /bin/sh in sudoers.  Data is
+        streamed between the two processes via a pipe so the full initrd
+        is never buffered in Python memory.
 
         Args:
             early_cpio: Path to early microcode cpio archive
@@ -305,20 +317,45 @@ class ProxmoxISOBuilder:
             return
 
         initrd_orig = initrd.with_suffix(".img.orig")
-        # Backup original initrd using sudo (may be root-owned)
-        cat_cmd = f"cat {early_cpio} {initrd_orig} > {initrd}"
         try:
+            # Backup original initrd (sudo mv is in sudoers)
             subprocess.run(
                 ["sudo", "mv", str(initrd), str(initrd_orig)],
                 check=True,
                 capture_output=True,
             )
-            # Combine: early_ucode + original_initrd
-            subprocess.run(
-                ["sudo", "sh", "-c", cat_cmd],
-                check=True,
-                capture_output=True,
+            # Combine early_ucode + original_initrd using allowed commands.
+            # Stream data through a pipe (cat → tee) so the full initrd
+            # never sits in Python memory — avoids OOM on large images.
+            cat_proc = subprocess.Popen(
+                ["sudo", "cat", str(early_cpio), str(initrd_orig)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            tee_proc = subprocess.Popen(
+                ["sudo", "tee", str(initrd)],
+                stdin=cat_proc.stdout,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+            # Allow cat_proc to receive SIGPIPE if tee exits early
+            if cat_proc.stdout:
+                cat_proc.stdout.close()
+            tee_stderr = tee_proc.communicate()[1]
+            # Drain cat's stderr before wait() to avoid pipe deadlock
+            cat_stderr = cat_proc.stderr.read() if cat_proc.stderr else b""
+            cat_proc.wait()
+
+            if cat_proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    cat_proc.returncode,
+                    cat_proc.args,
+                    stderr=cat_stderr,
+                )
+            if tee_proc.returncode is not None and tee_proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    tee_proc.returncode, tee_proc.args, stderr=tee_stderr
+                )
         except subprocess.CalledProcessError:
             # Attempt to restore the original initrd from the backup
             try:

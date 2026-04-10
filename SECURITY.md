@@ -30,5 +30,12 @@ This project follows security best practices:
 - All dependencies are pinned to specific versions (see [VERSIONS.md](VERSIONS.md))
 - GitHub Actions are pinned to commit hashes to prevent supply chain attacks
 - Container images use non-root users where possible
+- Docker containers run with least-privilege capabilities (no `--privileged`)
+- Sudoers configuration is scoped to specific binaries required for ISO operations
+- TLS certificate verification is enforced for all downloads
+- Docker image builds generate provenance attestations and SBOM
+- Release artifacts include SHA256 checksums for integrity verification
+- Dockerfile and shell scripts are linted (Hadolint, ShellCheck) in CI
 - Regular security scans with Trivy in CI/CD pipeline
 - Code quality checks with static analysis tools
+- A `.dockerignore` file prevents secrets and unnecessary files from entering Docker builds

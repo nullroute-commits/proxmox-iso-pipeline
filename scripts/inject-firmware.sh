@@ -1,7 +1,7 @@
 #!/bin/bash
 # Firmware injection script
 
-set -e
+set -euo pipefail
 
 ISO_ROOT="${1:-./work/iso_root}"
 FIRMWARE_DIR="${2:-./firmware-cache}"

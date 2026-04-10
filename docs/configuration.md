@@ -60,7 +60,7 @@ All environment variables and their descriptions:
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `BUILD_ARCH` | string | `linux/amd64,linux/arm64` | Comma-separated architectures |
+| `BUILD_ARCH` | string | `linux/amd64,linux/arm64,linux/loong64` | Comma-separated architectures |
 
 ### Directory Paths
 
@@ -89,7 +89,7 @@ export DEBIAN_RELEASE=trixie
 export INCLUDE_NVIDIA=true
 export INCLUDE_AMD=true
 export INCLUDE_INTEL=true
-export BUILD_ARCH=linux/amd64,linux/arm64
+export BUILD_ARCH=linux/amd64,linux/arm64,linux/loong64
 export OUTPUT_DIR=./output
 export WORK_DIR=./work
 export FIRMWARE_CACHE=./firmware-cache
@@ -123,6 +123,7 @@ include_intel: true
 build_arch:
   - linux/amd64
   - linux/arm64
+  - linux/loong64
 
 # Directory paths (relative or absolute)
 output_dir: ./output
@@ -143,7 +144,8 @@ Create `config.json`:
   "include_intel": true,
   "build_arch": [
     "linux/amd64",
-    "linux/arm64"
+    "linux/arm64",
+    "linux/loong64"
   ],
   "output_dir": "./output",
   "work_dir": "./work",
@@ -343,17 +345,24 @@ To add custom firmware:
 ### docker-compose.yml Configuration
 
 ```yaml
-version: '3.9'
-
 services:
   builder:
     build:
       context: .
       dockerfile: docker/Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
-    privileged: true  # Required for ISO mounting
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache
+    image: proxmox-iso-builder:latest
+    container_name: proxmox-iso-builder
+    init: true  # Proper PID 1 handling
+    # Use specific capabilities instead of full privileged mode
+    cap_add:
+      - SYS_ADMIN  # Required for mount/umount ISO operations
+      - MKNOD      # Required for loop device creation
+    devices:
+      - /dev/loop-control:/dev/loop-control
+    security_opt:
+      - apparmor:unconfined
     volumes:
       - ./output:/workspace/output
       - ./work:/workspace/work
@@ -366,7 +375,42 @@ services:
       - INCLUDE_NVIDIA=${INCLUDE_NVIDIA:-true}
       - INCLUDE_AMD=${INCLUDE_AMD:-true}
       - INCLUDE_INTEL=${INCLUDE_INTEL:-true}
-      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64}
+    networks:
+      - iso-builder-network
+
+  firmware-downloader:
+    image: proxmox-iso-builder:latest
+    container_name: firmware-downloader
+    init: true
+    volumes:
+      - ./firmware-cache:/workspace/firmware-cache
+      - ./config:/workspace/config:ro
+    environment:
+      - DEBIAN_RELEASE=${DEBIAN_RELEASE:-trixie}
+    command: python -c "from src.firmware import FirmwareManager; import os, pathlib; fm = FirmwareManager(pathlib.Path('/workspace/firmware-cache'), os.environ['DEBIAN_RELEASE']); fm.download_firmware('freeware'); print('Firmware download complete')"
+    depends_on:
+      - builder
+    networks:
+      - iso-builder-network
+
+  linter:
+    image: proxmox-iso-builder:latest
+    container_name: iso-builder-linter
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    volumes:
+      - ./src:/workspace/src:ro
+      - ./.flake8:/workspace/.flake8:ro
+      - ./pyproject.toml:/workspace/pyproject.toml:ro
+    command: lint
+    networks:
+      - iso-builder-network
+
+networks:
+  iso-builder-network:
+    driver: bridge
 ```
 
 ### Volume Mounts
@@ -407,7 +451,7 @@ services:
 | `include_nvidia` | `true` |
 | `include_amd` | `true` |
 | `include_intel` | `true` |
-| `build_arch` | `["linux/amd64", "linux/arm64"]` |
+| `build_arch` | `["linux/amd64", "linux/arm64", "linux/loong64"]` |
 | `output_dir` | `./output` |
 | `work_dir` | `./work` |
 | `firmware_cache` | `./firmware-cache` |

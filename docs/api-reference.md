@@ -500,7 +500,7 @@ class BuildConfig:
         include_nvidia: Include NVIDIA firmware (default: True)
         include_amd: Include AMD firmware (default: True)
         include_intel: Include Intel firmware (default: True)
-        build_arch: Target architectures (default: amd64, arm64)
+        build_arch: Target architectures (default: amd64, arm64, loong64)
         output_dir: Output directory for ISOs
         work_dir: Working directory for builds
         firmware_cache: Firmware package cache directory
