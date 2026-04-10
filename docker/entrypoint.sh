@@ -1,7 +1,14 @@
 #!/bin/bash
 # Entrypoint script for Proxmox ISO builder container
 
-set -e
+set -eo pipefail
+
+# Graceful shutdown handler
+shutdown_handler() {
+    echo -e "\033[0;36m[INFO]\033[0m Received shutdown signal, cleaning up..."
+    exit 0
+}
+trap shutdown_handler SIGTERM SIGINT
 
 # Function to print colored output
 print_info() {
@@ -29,7 +36,7 @@ print_info "Python version: $(python --version)"
 print_info "Architecture: $(uname -m)"
 
 # Check if running as root (needed for ISO operations)
-if [ "$EUID" -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ]; then
     print_info "Running with elevated privileges (required for ISO operations)"
 fi
 
@@ -45,11 +52,11 @@ elif [ "$1" = "lint" ]; then
     print_info "Checking PEP8 compliance with flake8..."
     flake8 src/
     print_success "PEP8 check passed!"
-    
+
     print_info "Checking PEP257 compliance with pydocstyle..."
     pydocstyle src/
     print_success "PEP257 check passed!"
-    
+
     print_info "Running Black formatter check..."
     black --check src/
     print_success "Black formatting check passed!"

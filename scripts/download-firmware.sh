@@ -1,7 +1,7 @@
 #!/bin/bash
 # Firmware download script
 
-set -e
+set -euo pipefail
 
 DEBIAN_RELEASE="${DEBIAN_RELEASE:-trixie}"
 CACHE_DIR="${FIRMWARE_CACHE:-./firmware-cache}"

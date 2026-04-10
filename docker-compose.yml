@@ -4,16 +4,21 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
       # Remote cache is optional - only used when ghcr.io is accessible
       # The pipeline works without GitHub by building locally
       cache_from:
         - type=local,src=/tmp/.buildx-cache
     image: proxmox-iso-builder:latest
     container_name: proxmox-iso-builder
-    privileged: true  # Required for ISO mounting operations
+    init: true  # Proper PID 1 handling and zombie process reaping
+    # Use specific capabilities instead of full privileged mode
+    cap_add:
+      - SYS_ADMIN     # Required for mount/umount ISO operations
+      - MKNOD          # Required for loop device creation
+    devices:
+      - /dev/loop-control:/dev/loop-control  # Loop device for ISO mounting
+    security_opt:
+      - apparmor:unconfined  # Required for mount operations
     volumes:
       - ./output:/workspace/output
       - ./work:/workspace/work
@@ -26,7 +31,6 @@ services:
       - INCLUDE_NVIDIA=${INCLUDE_NVIDIA:-true}
       - INCLUDE_AMD=${INCLUDE_AMD:-true}
       - INCLUDE_INTEL=${INCLUDE_INTEL:-true}
-      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64}
     networks:
       - iso-builder-network
 
@@ -34,6 +38,7 @@ services:
   firmware-downloader:
     image: proxmox-iso-builder:latest
     container_name: firmware-downloader
+    init: true
     volumes:
       - ./firmware-cache:/workspace/firmware-cache
       - ./config:/workspace/config:ro
@@ -49,6 +54,10 @@ services:
   linter:
     image: proxmox-iso-builder:latest
     container_name: iso-builder-linter
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
     volumes:
       - ./src:/workspace/src:ro
       - ./.flake8:/workspace/.flake8:ro
@@ -60,11 +69,3 @@ services:
 networks:
   iso-builder-network:
     driver: bridge
-
-volumes:
-  output:
-    driver: local
-  work:
-    driver: local
-  firmware-cache:
-    driver: local

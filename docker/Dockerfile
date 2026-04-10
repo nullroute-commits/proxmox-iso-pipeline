@@ -6,12 +6,16 @@
 ARG BASE_IMAGE=debian:trixie-20241202-slim
 FROM ${BASE_IMAGE} AS base
 
+# Use bash with pipefail for reliable error handling in RUN commands
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Architecture argument for conditional package installation
+# Architecture arguments (BUILDPLATFORM = host, TARGETARCH = target)
+ARG BUILDPLATFORM
 ARG TARGETARCH
 
 # Configure apt sources to include non-free and non-free-firmware repositories
@@ -21,7 +25,8 @@ RUN echo "deb http://deb.debian.org/debian trixie main contrib non-free non-free
 
 # Install architecture-independent system dependencies with pinned versions
 # These packages have the same version across all architectures
-RUN apt-get update && apt-get install -y \
+# --no-install-recommends reduces image size by avoiding unnecessary packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.13=3.13.5-2 \
     python3.13-venv=3.13.5-2 \
     python3-pip=25.1.1+dfsg-1 \
@@ -32,6 +37,7 @@ RUN apt-get update && apt-get install -y \
     sudo=1.9.16p2-3 \
     ca-certificates=20250419 \
     gnupg=2.4.7-21 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install architecture-specific packages with pinned versions
@@ -39,7 +45,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         # amd64-specific packages with pinned versions
-        apt-get install -y \
+        apt-get install -y --no-install-recommends \
             xorriso=1.5.6-1.2+b1 \
             genisoimage=9:1.1.11-4 \
             squashfs-tools=1:4.6.1-1 \
@@ -49,11 +55,12 @@ RUN apt-get update && \
         # arm64-specific packages with pinned versions
         # Note: syslinux is not available on arm64 (x86-only bootloader)
         # Note: squashfs-tools has arch-specific binary rebuild on arm64
-        apt-get install -y \
+        apt-get install -y --no-install-recommends \
             xorriso=1.5.6-1.2+b1 \
             genisoimage=9:1.1.11-4 \
             squashfs-tools=1:4.6.1-1+b1; \
     fi && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Python environment
@@ -140,16 +147,22 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Create non-root user for running the application
+# Sudoers: only allow the specific binaries required for ISO build operations
+# Intentionally excludes /bin/sh to prevent arbitrary command execution
 RUN useradd -m -u 1000 builder && \
     chown -R builder:builder /workspace && \
     echo "# Allow builder to run specific commands for ISO operations" >> /etc/sudoers && \
-    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /bin/mv, /bin/cat, /bin/sh, /usr/bin/tee, /usr/bin/apt-get" >> /etc/sudoers
+    echo "builder ALL=(ALL) NOPASSWD: /bin/mount, /bin/umount, /bin/cp, /bin/chmod, /bin/mkdir, /bin/mv, /bin/cat, /usr/bin/tee, /usr/bin/apt-get" >> /etc/sudoers
 
 # Set default user
 USER builder
 
 # Expose volume mount points
 VOLUME ["/workspace/output", "/workspace/work", "/workspace/firmware-cache"]
+
+# Healthcheck: verify python and core tool availability
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=2 \
+    CMD ["python", "-c", "import src; print('ok')"]
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

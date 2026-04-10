@@ -2,7 +2,7 @@
 # Build early microcode initramfs for Intel/AMD CPUs
 # This creates an early cpio archive that gets loaded before the main initrd
 
-set -e
+set -euo pipefail
 
 ISO_ROOT="${1:-./work/iso_root}"
 FIRMWARE_DIR="$ISO_ROOT/firmware"

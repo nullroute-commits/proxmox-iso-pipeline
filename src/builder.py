@@ -78,10 +78,17 @@ class ProxmoxISOBuilder:
             logger.info(f"Downloading Proxmox ISO from: {url}")
 
             try:
-                # Use wget for downloading with certificate verification disabled
-                # (some enterprise mirrors have certificate issues)
+                # Use wget with certificate verification enabled for security
+                # The ca-certificates package in the Docker image provides
+                # the trust store needed for HTTPS connections
                 subprocess.run(
-                    ["wget", "--no-check-certificate", "-O", str(iso_path), url],
+                    [
+                        "wget",
+                        "--ca-certificate=/etc/ssl/certs/ca-certificates.crt",
+                        "-O",
+                        str(iso_path),
+                        url,
+                    ],
                     check=True,
                     capture_output=True,
                 )

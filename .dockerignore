@@ -1,0 +1,62 @@
+# Version control
+.git
+.gitignore
+
+# GitHub
+.github
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+LICENSE
+
+# Build artifacts & outputs
+output/
+work/
+iso-work/
+firmware-cache/
+downloads/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# IDE & editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+
+# ISO & tarball artifacts
+*.iso
+*.tar
+*.tar.gz
+
+# Logs & temp
+*.log
+logs/
+tmp/
+temp/
+*.tmp
