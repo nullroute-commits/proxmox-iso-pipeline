@@ -95,6 +95,10 @@ All actions are pinned to commit hashes for security (preventing supply chain at
 |--------|---------|-------------|---------|
 | actions/checkout | v6.0.1 | 8e8c483db84b4bee98b60c0593521ed34d9990e8 | Repository checkout |
 | actions/setup-python | v6.1.0 | 83679a892e2d95755f2dac6acb0bfd1e9ac5d548 | Python environment setup |
+| actions/upload-artifact | v4.6.2 | 4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 | Artifact upload |
+| actions/download-artifact | v4.1.9 | cc203385981b70ca67e1cc392babf9cc229d5806 | Artifact download |
+| hadolint/hadolint-action | v3.1.0 | 54c9adbab1582c2ef04b2016b760714a4bfde3cf | Dockerfile linting |
+| ludeeus/action-shellcheck | 2.0.0 | 00cae500b08a931fb5698e11e79bfbd38e612a38 | Shell script linting |
 | docker/setup-qemu-action | v3.7.0 | c7c53464625b32c7a7e944ae62b3e17d2b600130 | QEMU emulation for multi-arch |
 | docker/setup-buildx-action | v3.12.0 | 8d2750c68a42422c14e847fe6c8ac0403b4cbd6f | Docker Buildx setup |
 | docker/login-action | v3.6.0 | 5e57cd118135c172c3672efd75eb46360885c0ef | Docker registry login |
@@ -102,11 +106,12 @@ All actions are pinned to commit hashes for security (preventing supply chain at
 | docker/build-push-action | v6.18.0 | 263435318d21b8e681c14492fe198d362a7d2c83 | Docker image build/push |
 | aquasecurity/trivy-action | 0.33.1 | b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 | Security vulnerability scanning |
 | github/codeql-action/upload-sarif | v4.31.9 | 7c9a7896f03bb1f3de14c5663ed46759e27443e0 | CodeQL SARIF upload |
+| softprops/action-gh-release | v2.2.2 | da05d552573ad5aba039eaac05058a918a7bf631 | GitHub release creation |
 
 ## Docker
 
 ### Docker Compose
-- **Version**: 3.9 (Compose file format)
+- **Format**: Compose V2 (no version key — `version` is deprecated in Docker Compose V2)
 
 ### Docker Image Tags
 - Base: `debian:trixie-20241202-slim`

@@ -209,6 +209,7 @@ docker compose run --rm linter
 proxmox-iso-pipeline/
 ├── tests/
 │   ├── __init__.py
+│   ├── conftest.py            # Pytest fixtures and shared test config
 │   ├── test_builder.py      # Builder module tests (19 tests)
 │   ├── test_config.py       # Config module tests (16 tests)
 │   ├── test_firmware.py     # Firmware module tests (12 tests)

@@ -345,17 +345,15 @@ To add custom firmware:
 ### docker-compose.yml Configuration
 
 ```yaml
-version: '3.9'
-
 services:
   builder:
     build:
       context: .
       dockerfile: docker/Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
-        - linux/loong64
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache
+    image: proxmox-iso-builder:latest
+    container_name: proxmox-iso-builder
     init: true  # Proper PID 1 handling
     # Use specific capabilities instead of full privileged mode
     cap_add:
@@ -377,7 +375,42 @@ services:
       - INCLUDE_NVIDIA=${INCLUDE_NVIDIA:-true}
       - INCLUDE_AMD=${INCLUDE_AMD:-true}
       - INCLUDE_INTEL=${INCLUDE_INTEL:-true}
-      - BUILD_ARCH=${BUILD_ARCH:-linux/amd64,linux/arm64,linux/loong64}
+    networks:
+      - iso-builder-network
+
+  firmware-downloader:
+    image: proxmox-iso-builder:latest
+    container_name: firmware-downloader
+    init: true
+    volumes:
+      - ./firmware-cache:/workspace/firmware-cache
+      - ./config:/workspace/config:ro
+    environment:
+      - DEBIAN_RELEASE=${DEBIAN_RELEASE:-trixie}
+    command: python -c "from src.firmware import FirmwareManager; import os, pathlib; fm = FirmwareManager(pathlib.Path('/workspace/firmware-cache'), os.environ['DEBIAN_RELEASE']); fm.download_firmware('freeware'); print('Firmware download complete')"
+    depends_on:
+      - builder
+    networks:
+      - iso-builder-network
+
+  linter:
+    image: proxmox-iso-builder:latest
+    container_name: iso-builder-linter
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    volumes:
+      - ./src:/workspace/src:ro
+      - ./.flake8:/workspace/.flake8:ro
+      - ./pyproject.toml:/workspace/pyproject.toml:ro
+    command: lint
+    networks:
+      - iso-builder-network
+
+networks:
+  iso-builder-network:
+    driver: bridge
 ```
 
 ### Volume Mounts

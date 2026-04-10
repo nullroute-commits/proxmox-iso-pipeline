@@ -179,6 +179,7 @@ proxmox-iso-pipeline/
 │   └── firmware-sources.json     # Firmware package definitions
 ├── tests/
 │   ├── __init__.py               # Test package initialization
+│   ├── conftest.py               # Pytest fixtures and shared test config
 │   ├── test_builder.py           # Builder module tests
 │   ├── test_config.py            # Config module tests
 │   ├── test_firmware.py          # Firmware module tests
