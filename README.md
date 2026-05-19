@@ -154,8 +154,7 @@ python -m src.builder --config config.yaml
 ```
 proxmox-iso-pipeline/
 ├── .github/
-│   ├── agents/
-│   │   └── agent.md              # GitHub Copilot agent configuration
+│   ├── agent.md                  # Upstream-derived GitHub Copilot agent SoT
 │   └── workflows/
 │       └── build-iso.yml         # CI/CD pipeline
 ├── src/
@@ -321,15 +320,20 @@ apt-cache policy <package-name>
 
 ## GitHub Copilot Integration
 
-This project includes a comprehensive GitHub Copilot agent configuration in `.github/agents/agent.md`. The agent is optimized for:
+This project includes an upstream-derived GitHub Copilot agent configuration in `.github/agent.md`.
+
+The file is the project-scoped overlay for the upstream [`nullroute-commits/agency-agents`](https://github.com/nullroute-commits/agency-agents) GitHub Copilot skill set, primarily combining the `DevOps Automator` and `Backend Architect` roles with repository-specific operating facts.
+
+The agent is optimized for:
 
 - Understanding the build pipeline architecture
 - Assisting with Python 3.13 development
 - Managing Docker and multi-arch builds
 - Firmware integration tasks
 - Maintaining PEP8/PEP257 compliance
+- Keeping repository-specific guidance aligned with the upstream agency-agents source of truth
 
-To use the agent, ensure GitHub Copilot is enabled in your IDE and reference the agent configuration.
+To use the agent, ensure GitHub Copilot is enabled in your IDE and reference `.github/agent.md` as the repository skill and source of truth.
 
 ## CI/CD Pipeline
 
